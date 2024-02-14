@@ -32,8 +32,6 @@ module tallyMap1DFactory_func
   use weightMap_class,   only : weightMap
   use cellMap_class,     only : cellMap
   use testMap_class,     only : testMap
-  use collNumMap_class,  only : collNumMap
-!  use matXsMap_class,    only : matXsMap
 
   implicit none
   private
@@ -51,8 +49,7 @@ module tallyMap1DFactory_func
                                                                                 'homogMatMap',&
                                                                                 'weightMap  ',&
                                                                                 'cellMap    ',&
-                                                                                'testMap    ',&
-                                                                                'collNumMap ']
+                                                                                'testMap    ']
 
 contains
 
@@ -102,9 +99,6 @@ contains
 
       case('testMap')
         allocate(testMap :: new)
-
-      case('collNumMap')
-        allocate(collNumMap :: new)
 
       case default
         print *, AVALIBLE_tallyMaps1D

@@ -16,11 +16,11 @@ module neutronXsPackages_class
   !!
   !! Public Members:
   !!   total            -> total Cross-Section [1/cm]
-  !!   elasticScatter   -> sum of MT=2 elastic neutron scattering [1/cm]
+  !!   elasticScatter   -> sum of MT = 2 elastic neutron scattering [1/cm]
   !!   inelasticScatter -> sum of all neutron producing reaction that are not elastic scattering
   !!     or fission. [1/cm]
   !!   capture          -> sum of all reactions without secendary neutrons excluding fission [1/cm]
-  !!   fission          -> total Fission MT=18 Cross-section [1/cm]
+  !!   fission          -> total Fission MT = 18 Cross-section [1/cm]
   !!   nuFission        -> total average neutron production Cross-section [1/cm]
   !!
   !!  Interface:
@@ -28,18 +28,19 @@ module neutronXsPackages_class
   !!    add   -> Add a nuclide microscopic XSs to macroscopic
   !!    get   -> Return XS by MT number
   !!
-  type, public :: neutronMacroXSs
-    real(defReal) :: total            = ZERO
-    real(defReal) :: elasticScatter   = ZERO
-    real(defReal) :: inelasticScatter = ZERO
-    real(defReal) :: capture          = ZERO
-    real(defReal) :: fission          = ZERO
-    real(defReal) :: nuFission        = ZERO
+  type, public:: neutronMacroXSs
+    real(defReal):: total            = ZERO
+    real(defReal):: elasticScatter   = ZERO
+    real(defReal):: inelasticScatter = ZERO
+    real(defReal):: capture          = ZERO
+    real(defReal):: fission          = ZERO
+    real(defReal):: nuFission        = ZERO
   contains
-    procedure :: clean => clean_neutronMacroXSs
-    procedure :: add   => add_neutronMacroXSs
-    procedure :: get
-    procedure :: invert => invert_macroXSs
+    procedure:: clean => clean_neutronMacroXSs
+    procedure:: add   => add_neutronMacroXSs
+    procedure:: get
+    procedure:: invert => invert_macroXSs
+    procedure:: invert_bl => invert_macroXSs_bl
   end type neutronMacroXSs
 
 
@@ -48,22 +49,23 @@ module neutronXsPackages_class
   !!
   !! Public Members:
   !!   total            -> total Cross-Section [barn]
-  !!   elasticScatter   -> MT=2 elastic neutron scattering [barn]
+  !!   elasticScatter   -> MT = 2 elastic neutron scattering [barn]
   !!   inelasticScatter -> all neutron producing reaction that are not elastic scattering
   !!     or fission. [barn]
   !!   capture          -> all reactions without secendary neutrons excluding fission [barn]
-  !!   fission          -> total Fission MT=18 Cross-section [barn]
+  !!   fission          -> total Fission MT = 18 Cross-section [barn]
   !!   nuFission        -> total average neutron production Cross-section [barn]
   !!
-  type, public :: neutronMicroXSs
-    real(defReal) :: total            = ZERO
-    real(defReal) :: elasticScatter   = ZERO
-    real(defReal) :: inelasticScatter = ZERO
-    real(defReal) :: capture          = ZERO
-    real(defReal) :: fission          = ZERO
-    real(defReal) :: nuFission        = ZERO
+  type, public:: neutronMicroXSs
+    real(defReal):: total            = ZERO
+    real(defReal):: elasticScatter   = ZERO
+    real(defReal):: inelasticScatter = ZERO
+    real(defReal):: capture          = ZERO
+    real(defReal):: fission          = ZERO
+    real(defReal):: nuFission        = ZERO
   contains
-    procedure :: invert => invert_microXSs
+    procedure:: invert => invert_microXSs
+    procedure :: invert_bl => invert_microXSs_bl
   end type neutronMicroXSs
 
 contains
@@ -80,7 +82,7 @@ contains
   !!   None
   !!
   elemental subroutine clean_neutronMacroXSs(self)
-    class(neutronMacroXSs), intent(inout) :: self
+    class(neutronMacroXSs), intent(inout):: self
 
     self % total            = ZERO
     self % elasticScatter   = ZERO
@@ -94,7 +96,7 @@ contains
   !!
   !! Add nuclide XSs on Macroscopic XSs
   !!
-  !! Takes microscopic XSs * density and adds them to neutronMacroXSs
+  !! Takes microscopic XSs*density and adds them to neutronMacroXSs
   !!
   !! Args:
   !!   micro [in] -> microscopic XSs
@@ -104,16 +106,16 @@ contains
   !!   None
   !!
   elemental subroutine add_neutronMacroXSs(self, micro, dens)
-    class(neutronMacroXSs), intent(inout) :: self
+    class(neutronMacroXSs), intent(inout):: self
     type(neutronMicroXSs), intent(in)     :: micro
     real(defReal), intent(in)             :: dens
 
-    self % total            = self % total            + dens * micro % total
-    self % elasticScatter   = self % elasticScatter   + dens * micro % elasticScatter
-    self % inelasticScatter = self % inelasticScatter + dens * micro % inelasticScatter
-    self % capture          = self % capture          + dens * micro % capture
-    self % fission          = self % fission          + dens * micro % fission
-    self % nuFission        = self % nuFission        + dens * micro % nuFission
+    self % total            = self % total            + dens*micro % total
+    self % elasticScatter   = self % elasticScatter   + dens*micro % elasticScatter
+    self % inelasticScatter = self % inelasticScatter+dens*micro % inelasticScatter
+    self % capture          = self % capture          + dens*micro % capture
+    self % fission          = self % fission          + dens*micro % fission
+    self % nuFission        = self % nuFission        + dens*micro % nuFission
 
   end subroutine add_neutronMacroXSs
 
@@ -130,7 +132,7 @@ contains
   !!   Returns 0.0 for invalid MT
   !!
   elemental function get(self, MT) result(xs)
-    class(neutronMacroXSs), intent(in) :: self
+    class(neutronMacroXSs), intent(in):: self
     integer(shortInt), intent(in)      :: MT
     real(defReal)                      :: xs
 
@@ -151,7 +153,7 @@ contains
         xs = self % nuFission
 
       case(macroAbsorbtion)
-        xs = self % fission + self % capture
+        xs = self % fission+self % capture
 
       case default
         xs = ZERO
@@ -160,13 +162,44 @@ contains
 
   end function get
 
+  !! Use a real r in < 0; 1 > to sample reaction for branchless algorithm from Macroscopic XSs
   !!
-  !! Use a real r in <0;1> to sample reaction from Macroscopic XSs
+  !! Args:
+  !!    r [in] -> Real number in < 0; 1>
+  !!    flag [in] -> flag 'true' for preserving the interface
+  !!
+  !!  Result:
+  !!    One of the macroscopic MT number
+  !!      elasticScatter = macroEscatter
+  !!      inelasticScatter = macroIEscatter
+  !!      fission = macroFission
+
+  elemental function invert_macroXSs_bl(self, r) result(MT)
+    class(neutronMacroXSs), intent(in):: self
+    real(defReal), intent(in):: r
+    integer(shortInt):: MT
+    real(defReal):: effectiveXStot
+    
+    effectiveXStot = self % elasticScatter + self % inelasticScatter &
+                    + self % nuFission
+    
+    if (r*effectiveXStot < self % elasticScatter) then
+      MT = N_N_ELASTIC
+    elseif (r*effectiveXStot < self % inelasticScatter+self % elasticScatter) then
+      MT = N_N_INELASTIC
+    elseif (r*effectiveXStot < self % inelasticScatter + self % elasticScatter + self % nuFission) then
+      MT = N_FISSION
+    else 
+      MT = huge(0_shortInt)
+    end if
+  end function invert_macroXSs_bl
+  !!
+  !! Use a real r in < 0; 1 > to sample reaction from Macroscopic XSs
   !!
   !! This function might be common thus is type-bound procedure for conveniance
   !!
   !! Args:
-  !!   r [in] -> Real number in <1;0>
+  !!   r [in] -> Real number in < 1; 0>
   !!
   !! Result:
   !!   One of the Macroscopic MT numbers
@@ -180,7 +213,7 @@ contains
   !!   If r > 1 then returns macroFission
   !!
   elemental function invert_macroXSs(self, r) result(MT)
-    class(neutronMacroXSs), intent(in) :: self
+    class(neutronMacroXSs), intent(in):: self
     real(defReal), intent(in)          :: r
     integer(shortInt)                  :: MT
     real(defReal)                      :: xs
@@ -188,21 +221,21 @@ contains
 
     ! Elastic Scattering
     C = 1
-    xs = self % total * r - self % elasticScatter
-    if (xs > ZERO) C = C + 1
+    xs = self % total*r - self % elasticScatter
+    if (xs > ZERO) C = C+1
 
     ! Inelastic Scattering
-    xs = xs - self % inelasticScatter
-    if(xs > ZERO) C = C + 1
+    xs = xs-self % inelasticScatter
+    if(xs > ZERO) C = C+1
 
     ! Capture
-    xs = xs - self % capture
-    if(xs > ZERO) C = C + 1
+    xs = xs-self % capture
+    if(xs > ZERO) C = C+1
 
     ! Choose MT number
     select case(C)
       case(1)
-        MT = macroEScatter
+        MT = macroEscatter
 
       case(2)
         MT = macroIEscatter
@@ -222,12 +255,12 @@ contains
 
 
   !!
-  !! Use a real r in <0;1> to sample reaction from Microscopic XSs
+  !! Use a real r in < 0; 1 > to sample reaction from Microscopic XSs
   !!
   !! This function involves a bit of code so is written for conviniance
   !!
   !! Args:
-  !!   r [in] -> Real number in <0;1>
+  !!   r [in] -> Real number in < 0; 1>
   !!
   !! Result:
   !!   MT number of the reaction:
@@ -241,7 +274,7 @@ contains
   !!   if r > 1 then returns N_FISSION
   !!
   elemental function invert_microXSs(self, r) result(MT)
-    class(neutronMicroXSs), intent(in) :: self
+    class(neutronMicroXSs), intent(in):: self
     real(defReal), intent(in)          :: r
     integer(shortInt)                  :: MT
     real(defReal)                      :: xs
@@ -249,16 +282,16 @@ contains
 
     ! Elastic Scattering
     C = 1
-    xs = self % total * r - self % elasticScatter
-    if (xs > ZERO) C = C + 1
+    xs = self % total*r - self % elasticScatter
+    if (xs > ZERO) C = C+1
 
     ! Inelastic Scattering
-    xs = xs - self % inelasticScatter
-    if(xs > ZERO) C = C + 1
+    xs = xs-self % inelasticScatter
+    if(xs > ZERO) C = C+1
 
     ! Capture
-    xs = xs - self % capture
-    if(xs > ZERO) C = C + 1
+    xs = xs-self % capture
+    if(xs > ZERO) C = C+1
 
     ! Choose MT number
     select case(C)
@@ -280,5 +313,23 @@ contains
 
   end function invert_microXSs
 
+elemental function invert_microXSs_bl(self, r) result(MT)
+  class(neutronMicroXSs), intent(in) :: self
+  real(defReal), intent(in) :: r
+  integer(shortInt) :: MT
+  real(defReal) :: E_eff
 
+
+  E_eff = r * (self % elasticScatter + self % inelasticScatter + self % nuFission)
+
+  if (E_eff < self % elasticScatter) then
+    MT = N_N_elastic
+  elseif (E_eff < self % elasticScatter + self % inelasticScatter) then
+    MT = N_N_inelastic
+  elseif (E_eff < self % elasticScatter + self % inelasticScatter + self % nuFission) then
+    MT = N_fission
+  else
+    MT = huge(0_shortInt)
+  end if
+end function invert_microXSs_bl
 end module neutronXsPackages_class

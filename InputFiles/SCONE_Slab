@@ -1,7 +1,7 @@
 type eigenPhysicsPackage;
 
 pop      15000;
-active   500;
+active   1000;
 inactive 200;
 XSdata   mg;
 dataType mg;
@@ -10,7 +10,7 @@ collisionOperator { neutronCE {type neutronCEstd;}
                     neutronMG {type neutronMGstd;}
                   }
 
-transportOperator { type transportOperatorDT;
+transportOperator { type transportOperatorST;
                   }
 
 inactiveTally {
@@ -65,12 +65,15 @@ materials {
       composition {
         92235.03  0.037047;
       }
-      xsFile ./XS/URRa_2_1_XSS;
+      xsFile /home/tbonnet/code/SCONE/InputFiles/XS/URRa_2_1_XSS;
     }
 
 }
 
 }
 
+viz {
+  plotBMP {type bmp; axis z; centre (0.0 0.0 0.0); width (18.98 20); res (1000 200); output geomZ;}
+  }
 
 

@@ -14,10 +14,9 @@ module tallyCodes
                                         outColl_CODE    = 1001 ,&
                                         path_CODE       = 1002 ,&
                                         trans_CODE      = 1003 ,&
-                                        spawn_CODE      = 1004 ,&
-                                        hist_CODE       = 1005 ,&
-                                        cycleStart_CODE = 1006 ,&
-                                        cycleEnd_CODE   = 1007
+                                        hist_CODE       = 1004 ,&
+                                        cycleStart_CODE = 1005 ,&
+                                        cycleEnd_CODE   = 1006
 
   ! List of codes for fiffrent particle fates
   integer(shortInt),parameter,public :: abs_FATE  = 5000 ,&

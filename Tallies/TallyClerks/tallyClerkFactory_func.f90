@@ -18,6 +18,7 @@ module tallyClerkFactory_func
   use shannonEntropyClerk_class,       only : shannonEntropyClerk
   use centreOfMassClerk_class,         only : centreOfMassClerk
   use mgXsClerk_class,                 only : mgXsClerk
+  use fissionSourceClerk_class,        only : fissionSourceClerk
 
   implicit none
   private
@@ -37,7 +38,8 @@ module tallyClerkFactory_func
                                                                         'shannonEntropyClerk      ',&
                                                                         'centreOfMassClerk        ',&
                                                                         'dancoffBellClerk         ',&
-                                                                        'mgXsClerk                ']
+                                                                        'mgXsClerk                ',&
+                                                                        'fissionSourceClerk       ']
 
 contains
 
@@ -89,6 +91,9 @@ contains
 
      case('mgXsClerk')
        allocate(mgXsClerk :: new)
+      
+     case('fissionSourceClerk')
+       allocate(fissionSourceClerk :: new)
 
       case default
         print *, AVALIBLE_tallyClerks

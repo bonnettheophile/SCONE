@@ -1,6 +1,7 @@
 module ceNeutronMaterial_class
 
   use numPrecision
+  use endfConstants
   use genericProcedures, only : fatalError
   use RNG_class,         only : RNG
   use particle_class,    only : particle
@@ -9,6 +10,8 @@ module ceNeutronMaterial_class
   use materialHandle_inter,    only : materialHandle
   use neutronMaterial_inter,   only : neutronMaterial
   use neutronXsPackages_class, only : neutronMacroXSs
+
+  ! Collision Data handle for branchless on material
 
   ! CE Neutron Interfaces
   use ceNeutronDatabase_inter, only : ceNeutronDatabase
@@ -65,6 +68,7 @@ module ceNeutronMaterial_class
     procedure, non_overridable :: getMacroXSs_byE
     procedure                  :: isFissile
     procedure, non_overridable :: sampleNuclide
+    procedure, non_overridable :: sampleNuclide_blm
     procedure, non_overridable :: sampleFission
     procedure, non_overridable :: sampleScatter
     procedure, non_overridable :: sampleScatterWithFission
@@ -260,6 +264,77 @@ contains
     call fatalError(Here,'Nuclide sampling loop failed to terminate')
 
   end function sampleNuclide
+
+  !!
+  !! Sample collision nuclide at energy E when using branchless collision on material
+  !!
+  !! This function randomly determines the exact nuclide for a collision
+  !! It uses nuclide total XSs to determine nuclide
+  !!
+  !! Args:
+  !!   E [in]       -> incident energy [MeV]
+  !!   rand [inout] -> random number generator
+  !!
+  !! Result:
+  !!   nucIdx of the sampled nuclide for collision
+  !!
+  !! Errors:
+  !!   fatalError if sampling fails for some reason (E.G. random number > 1)
+  !!   fatalError if E is out-of-bounds of the present data
+  !!
+  function sampleNuclide_blm(self, MT, E, rand) result(nucIdx)
+    class(ceNeutronMaterial), intent(in) :: self
+    integer(shortInt), intent(in) :: MT
+    real(defReal), intent(in) :: E
+    class(RNG), intent(inout) :: rand
+    integer(shortInt) :: nucIdx
+    real(defReal) :: xs, tot_scatter, tot_scatter_nuc
+    integer(shortInt) :: i
+    character(100), parameter :: Here = 'sampleNuclide_blm (ceNeutronMaterial_class.f90)'
+
+    if(E /= materialCache(self % matIdx) % E_tot) then
+      call self % data % updateTotalMatXS(E, self % matIdx, rand)
+    end if
+    ! Update macroscopic XS that will be used to select the nuclide
+    if (E /= materialCache(self % matIdx) % E_tail) call self % data % updateMacroXSs(E, self % matIdx, rand)
+
+    ! Select nuclide if reaction channel is fission
+    if (MT == N_FISSION) then
+      xs = materialCache(self % matIdx) % xss % nuFission * rand % get()
+
+      do i = 1, size(self % nuclides)
+        nucIdx = self % nuclides(i)
+        if (E /= nuclideCache(nucIdx) % E_tail) call self % data % updateMicroXSs(E, nucIdx, rand)
+        xs = xs - nuclideCache(nucIdx) % xss % nuFission * self % dens(i)
+        if (xs < ZERO) return
+      end do
+    ! Select nuclide if reaction channel is elastic scattering 
+    elseif(MT == N_N_ELASTIC) then
+      tot_scatter = materialCache(self % matIdx) % xss % elasticScatter
+      xs = tot_scatter * rand % get()
+      do i = 1, size(self % nuclides)
+        nucIdx = self % nuclides(i)
+        if (E /= nuclideCache(nucIdx) % E_tail) call self % data % updateMicroXSs(E, nucIdx, rand)
+        tot_scatter_nuc = nuclideCache(nucIdx) % xss % elasticScatter
+        xs = xs - tot_scatter_nuc * self % dens(i)
+        if (xs < ZERO) return
+      end do
+    ! Select nuclide if reaction channel is inelastic scattering
+    elseif(MT == N_N_INELASTIC) then
+      tot_scatter = materialCache(self % matIdx) % xss % inelasticScatter
+      xs = tot_scatter * rand % get()
+      do i = 1, size(self % nuclides)
+        nucIdx = self % nuclides(i)
+        if (E /= nuclideCache(nucIdx) % E_tail) call self % data % updateMicroXSs(E, nucIdx, rand)
+        tot_scatter_nuc = nuclideCache(nucIdx) % xss % inelasticScatter
+        xs = xs - tot_scatter_nuc * self % dens(i)
+        if (xs < ZERO) return
+      end do
+
+    end if
+
+    call fatalError(Here, 'Branchless on material nuclide sampling loop failed')
+  end function sampleNuclide_blm
 
   !!
   !! Sample fission nuclide given that a fission neutron was produced

@@ -7,7 +7,7 @@ XSdata   mg;
 dataType mg;
 
 collisionOperator { neutronCE {type neutronCEstd;}
-                    neutronMG {type neutronMGstd;}
+                    neutronMG {type neutronMGbls;}
                   }
 
 transportOperator { type transportOperatorDT;
@@ -58,7 +58,7 @@ nuclearData {
 
   handles {
      ce { type aceNeutronDatabase; aceLibrary $SCONE_ACE;}
-     mg { type baseMgNeutronDatabase; PN P0;}
+     mg { type baseMgNeutronDatabase; PN P1;}
   }
 
 
@@ -69,7 +69,7 @@ materials {
       composition {
         92235.03  0.037047;
       }
-      xsFile ./XS/URRa_2_1_XSS;
+      xsFile /home/tbonnet/code/SCONE/InputFiles/XS/URRa_2_1_XSS;
     }
 
 }

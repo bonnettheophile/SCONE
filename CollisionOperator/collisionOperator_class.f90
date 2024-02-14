@@ -1,5 +1,5 @@
 module collisionOperator_class
-
+  
   use numPrecision
   use genericProcedures,     only : fatalError, numToChar
   use dictionary_class,      only : dictionary
@@ -19,17 +19,17 @@ module collisionOperator_class
   !!
   !! Local parameters
   !!
-  integer(shortInt), parameter :: MAX_P_ID = max(P_NEUTRON, P_PHOTON)
-  integer(shortInt), parameter :: P_MG = 1, P_CE = 2
-  integer(shortInt), parameter :: UNDEF_PHYSICS = -1
-  integer(shortInt), parameter :: MAX_PHYSICS = 3
+  integer(shortInt), parameter:: MAX_P_ID = max(P_NEUTRON, P_PHOTON)
+  integer(shortInt), parameter:: P_MG = 1, P_CE = 2
+  integer(shortInt), parameter:: UNDEF_PHYSICS = -1
+  integer(shortInt), parameter:: MAX_PHYSICS = 3
 
 
   !!
   !! Local helper type to store polymorphic collisionProcessors in an array
   !!
-  type, private :: collProc
-    class(collisionProcessor), allocatable :: proc
+  type, private:: collProc
+    class(collisionProcessor), allocatable:: proc
   end type collProc
 
 
@@ -48,18 +48,18 @@ module collisionOperator_class
   !!    #neutronMG {<collisonProcessorDefinition>} #
   !!  }
   !!
-  type, public :: collisionOperator
+  type, public:: collisionOperator
     private
     type(collProc), dimension(MAX_PHYSICS)    :: physicsTable
-    integer(shortInt), dimension(2, MAX_P_ID) :: lookupTable = UNDEF_PHYSICS
+    integer(shortInt), dimension(2, MAX_P_ID):: lookupTable = UNDEF_PHYSICS
 
   contains
     ! Build procedures
-    procedure :: init
-    procedure :: kill
+    procedure:: init
+    procedure:: kill
 
     ! Use procedures
-    procedure :: collide
+    procedure:: collide
 
 
   end type collisionOperator
@@ -70,7 +70,7 @@ contains
   !! Initialise collision operator
   !!
   subroutine init(self, dict)
-    class(collisionOperator), intent(inout) :: self
+    class(collisionOperator), intent(inout):: self
     class(dictionary), intent(in)           :: dict
 
     if(dict % isPresent('neutronCE')) then
@@ -89,14 +89,14 @@ contains
   !! Clear collision operator. Return to uninitialised state
   !!
   elemental subroutine kill(self)
-    class(collisionOperator), intent(inout) :: self
+    class(collisionOperator), intent(inout):: self
     integer(shortInt)                       :: i
 
     ! Set default to lookup table
     self % lookupTable = UNDEF_PHYSICS
 
     ! Deallocate collision processors
-    do i=1,size(self % physicsTable)
+    do i = 1, size(self % physicsTable)
       if(allocated(self % physicsTable(i) % proc)) then
         deallocate( self % physicsTable(i) % proc)
       end if
@@ -108,13 +108,13 @@ contains
   !! Determine type of the particle and call approperiate collisionProcessor
   !!
   subroutine collide(self, p, tally, thisCycle, nextCycle)
-    class(collisionOperator), intent(inout) :: self
+    class(collisionOperator), intent(inout):: self
     class(particle), intent(inout)           :: p
     type(tallyAdmin), intent(inout)          :: tally
-    class(particleDungeon),intent(inout)     :: thisCycle
-    class(particleDungeon),intent(inout)     :: nextCycle
+    class(particleDungeon), intent(inout)     :: thisCycle
+    class(particleDungeon), intent(inout)     :: nextCycle
     integer(shortInt)                        :: idx, procType
-    character(100), parameter :: Here = 'collide (collisionOperator_class.f90)'
+    character(100), parameter:: Here = 'collide (collisionOperator_class.f90)'
 
     ! Select processing index with ternary expression
     if(p % isMG) then
@@ -133,7 +133,7 @@ contains
 
     ! Verify index
     if(idx == UNDEF_PHYSICS) then
-      call fatalError(Here,'Physics is not defined for particle of type : '// p % typeToChar())
+      call fatalError(Here, 'Physics is not defined for particle of type : '// p % typeToChar())
     end if
 
     ! Call physics

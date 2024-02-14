@@ -153,10 +153,9 @@ contains
   !!
   !! See nuclearDatabase_inter for details
   !!
-  subroutine activate(self, activeMat, silent)
+  subroutine activate(self, activeMat)
     class(testNeutronDatabase), intent(inout)   :: self
     integer(shortInt), dimension(:), intent(in) :: activeMat
-    logical(defBool), optional, intent(in)      :: silent
 
     ! Do nothing
 

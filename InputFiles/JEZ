@@ -6,7 +6,7 @@
 type eigenPhysicsPackage;
 
 pop      20000;
-active   500;
+active   10000;
 inactive 200;
 XSdata   ceData;
 dataType ce;
@@ -21,7 +21,7 @@ seed 3;
 !     dir (1.0 0.0 0.0);
 !     }
 
-collisionOperator { neutronCE {type neutronCEstd;}
+collisionOperator { neutronCE {type neutronCEblm;}
                     neutronMG {type neutronMGstd;}
                   }
 
@@ -73,7 +73,7 @@ geometry {
 nuclearData {
 
   handles {
-     ceData { type aceNeutronDatabase; aceLibrary $SCONE_ACE;}
+     ceData { type aceNeutronDatabase; aceLibrary /home/tbonnet/nuclear_data/full_lib.xsfile;}
   }
 
 

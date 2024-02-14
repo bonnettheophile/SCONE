@@ -35,10 +35,10 @@ module scoreMemory_class
   !!
   !!     kill(): Elemental. Return to uninitialised state.
   !!
-  !!     score(score,idx): Score in the bin under idx. FatalError if idx is outside bounds. Score
+  !!     score(score,idx): Score in the bin under idx (during generations). FatalError if idx is outside bounds. Score
   !!         is defReal, shortInt or longInt
   !!
-  !!     accumulate(score,idx): Accumulate result in cumulative sums in bin under idx. FatalError
+  !!     accumulate(score,idx): Accumulate result in cumulative sums in bin under idx (between generations). FatalError
   !!         if idx is outside bounds. Score is defReal, shortInt or longInt.
   !!
   !!     getResult(mean, STD, idx, samples): Retrieve mean value and standard deviation of the
@@ -276,7 +276,6 @@ contains
 
     ! Increment Cycle Counter
     self % cycles = self % cycles + 1
-
     if(mod(self % cycles, self % batchSize) == 0) then ! Close Batch
       
       !$omp parallel do
@@ -394,6 +393,7 @@ contains
     else
       inv_Nm1 = ONE
     end if
+
     STD = self % bins(idx, CSUM2) *inv_N * inv_Nm1 - mean * mean * inv_Nm1
     STD = sqrt(STD)
 

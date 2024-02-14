@@ -2,8 +2,7 @@ module baseMgNeutronDatabase_class
 
   use numPrecision
   use endfConstants
-  use errors_mod,         only : fatalError
-  use genericProcedures,  only : numToChar
+  use genericProcedures,  only : fatalError, numToChar
   use particle_class,     only : particle
   use charMap_class,      only : charMap
   use dictionary_class,   only : dictionary
@@ -20,10 +19,6 @@ module baseMgNeutronDatabase_class
 
   ! baseMgNeutron Objects
   use baseMgNeutronMaterial_class, only : baseMgNeutronMaterial
-
-  ! MG NEUTRON CACHE
-  use mgNeutronCache_mod,           only : cache_materialCache => materialCache, &
-                                           cache_init => init
 
   implicit none
   private
@@ -73,7 +68,6 @@ module baseMgNeutronDatabase_class
     procedure :: activate
 
     ! Local interface
-    procedure :: initMajorant
     procedure :: nGroups
 
   end type baseMgNeutronDatabase
@@ -114,22 +108,7 @@ contains
     integer(shortInt), intent(in)               :: matIdx
     real(defReal)                               :: xs
 
-    associate (matCache => cache_materialCache(matIdx))
-
-      if (matCache % G_tot /= p % G) then
-        ! Get cross section
-        xs = self % mats(matIdx) % getTotalXS(p % G, p % pRNG)
-        ! Update cache
-        matCache % xss % total = xs
-        matCache % G_tot = p % G
-
-      else
-        ! Retrieve cross section from cache
-        xs = matCache % xss % total
-
-      end if
-
-    end associate
+    xs = self % mats(matIdx) % getTotalXS(p % G, p % pRNG)
 
   end function getTotalMatXS
 
@@ -185,8 +164,7 @@ contains
     if(matIdx < 1 .or. matIdx > size(self % mats)) then
       mat => null()
     else
-      ! Retrieve pointer from cache
-      mat => cache_materialCache(matIdx) % mat
+      mat => self % mats(matIdx)
     end if
 
   end function getMaterial
@@ -329,54 +307,18 @@ contains
   !!
   !! See nuclearDatabase documentation for details
   !!
-  subroutine activate(self, activeMat, silent)
+  subroutine activate(self, activeMat)
     class(baseMgNeutronDatabase), intent(inout) :: self
     integer(shortInt), dimension(:), intent(in) :: activeMat
-    logical(defBool), optional, intent(in)      :: silent
-    logical(defBool)                            :: loud
-    integer(shortInt)                           :: idx
-
-    if(allocated(self % activeMats)) deallocate(self % activeMats)
-    self % activeMats = activeMat
-
-    ! Initialies cross section cache
-    call cache_init(size(self % mats))
-
-    ! Store the material pointer in the material cache
-    !$omp parallel
-    do idx = 1,size(self % mats)
-      cache_materialCache(idx) % mat => self % mats(idx)
-    end do
-    !$omp end parallel
-
-    ! Set build console output flag
-    if (present(silent)) then
-      loud = .not. silent
-    else
-      loud = .true.
-    end if
-
-    ! Build unionised majorant
-    call self % initMajorant(loud)
-
-  end subroutine activate
-
-  !!
-  !! Precomputes majorant cross section
-  !!
-  !! See nuclearDatabase documentation for details
-  !!
-  subroutine initMajorant(self, loud)
-    class(baseMgNeutronDatabase), intent(inout) :: self
-    logical(defBool), intent(in)                :: loud
     integer(shortInt)                           :: g, i, idx
     real(defReal)                               :: xs
     integer(shortInt), parameter                :: TOTAL_XS = 1
 
-    ! Allocate majorant
-    allocate (self % majorant(self % nG))
+    if(allocated(self % activeMats)) deallocate(self % activeMats)
+    self % activeMats = activeMat
 
-    ! Loop over energy groups
+    ! Precalculate majorant xs for delta tracking
+    allocate (self % majorant(self % nG))
     do g = 1,self % nG
       xs = ZERO
       do i = 1,size(self % activeMats)
@@ -386,9 +328,7 @@ contains
       self % majorant(g) = xs
     end do
 
-    if (loud) print '(A)', 'MG unionised majorant cross section calculation completed'
-
-  end subroutine initMajorant
+  end subroutine activate
 
   !!
   !! Return number of energy groups in this database
@@ -419,7 +359,7 @@ contains
   !!
   pure function baseMgNeutronDatabase_TptrCast(source) result(ptr)
     class(nuclearDatabase), pointer, intent(in) :: source
-    type(baseMgNeutronDatabase), pointer        :: ptr
+    type(baseMgNeutronDatabase), pointer           :: ptr
 
     select type(source)
       type is(baseMgNeutronDatabase)

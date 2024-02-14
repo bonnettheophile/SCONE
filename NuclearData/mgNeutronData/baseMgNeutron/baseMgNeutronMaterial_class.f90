@@ -154,7 +154,6 @@ contains
                            ' Data has only: ' // numToChar(self % nGroups()))
       xs = ZERO ! Avoid warning
     end if
-
     xs = self % data(TOTAL_XS, G)
 
   end function getTotalXS

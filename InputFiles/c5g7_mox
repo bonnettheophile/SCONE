@@ -1,15 +1,17 @@
 type eigenPhysicsPackage;
 
-pop      20000;
-active   200;
+pop      100000;
+active   1000;
 inactive 100;
 XSdata ce;
 dataType ce;
+outputFormat asciiJSON;
+outputFile B100/blm_ref;
 
 // Specify output format default asciiMATLAB
 //outputFormat asciiJSON;
 
-collisionOperator { neutronCE {type neutronCEstd;}
+collisionOperator { neutronCE {type neutronCEblm; minWgt 0.4; maxWgt 2.0; avWgt 1.0;}
                     neutronMG {type neutronMGstd;} }
 
 transportOperator { type transportOperatorST;
@@ -21,18 +23,39 @@ transportOperator { type transportOperatorST;
 inactiveTally {}
 
 activeTally {
-  norm totalPow;
+  display ( kAnalog );
   normVal 100.0;
-  totalPow  { type collisionClerk; response (fission); fission { type macroResponse; MT -6;}}
+  kAnalog {type keffAnalogClerk;}
+  totalPow  { type collisionClerk; response (fission); fission { type macroResponse; MT -6;}
+              map {type multiMap; maps (xdir ydir);
+                xdir {type spaceMap; axis x; grid lin; min -10.71; max 10.71; N 100;} 
+                ydir {type spaceMap; axis y; grid lin; min -10.71; max 10.71; N 100;}}
+}
+
+  totalPowX  { type collisionClerk; response (fission); fission { type macroResponse; MT -6;}
+              map {type spaceMap; axis x; grid lin; min -10.71; max 10.71; N 100;}}
+
   ResMap {type collisionClerk;
          map {type multiMap;
               maps (ene mat);
-              ene { type energyMap; grid log; min 1.0E-11; max 20.0; N 300;}
+              ene { type energyMap; grid log; min 1.0E-11; max 20.0; N 100;}
               mat { type materialMap; materials (water mox87 mox70 mox43);}
               }
          response (flux);
          flux { type fluxResponse;}
          }
+  fissionSourceX { type fissionSourceClerk; map { type spaceMap; axis x; grid lin; min -10.71; max 10.71; N 100;}}
+  fissionSource { type fissionSourceClerk; map { type multiMap; maps (xdir ydir);
+    xdir {type spaceMap; axis x; grid lin; min -10.71; max 10.71; N 100;} 
+    ydir {type spaceMap; axis y; grid lin; min -10.71; max 10.71; N 100;}
+    }
+  }
+  entropy { type shannonEntropyClerk; map {type multiMap; maps (xdir ydir);
+    xdir {type spaceMap; axis x; grid lin; min -10.71; max 10.71; N 100;} 
+    ydir {type spaceMap; axis y; grid lin; min -10.71; max 10.71; N 100;}
+    }
+    cycles 100000;
+  }
 }
 
 geometry {
@@ -106,7 +129,6 @@ viz {
     centre (0.0 0.0 0.0);
     //width (25.0 25.0);
     axis z;
-    offset -17;
     res (500 500);
   }
 }
@@ -114,19 +136,16 @@ viz {
 
 nuclearData {
   handles {
-    ce {type aceNeutronDatabase; aceLibrary $SCONE_ACE;}
+    ce {type aceNeutronDatabase; aceLibrary /home/tbonnet/nuclear_data/full_lib.xsfile; ures 0;}
   }
   materials {
 
     water {
       temp 75675;
-      rgb (0 0 139); // Colour of water is dark blue
-      moder { 1001.03 h-h2o.42; }
+      moder { 1001.03 hh2o.00; }
       composition {
-      1001.03    6.700E-002;
-      8016.03    3.350E-002;
-      5010.03    5.560E-006;
-      5011.03    2.224E-005; }
+      1001.03    6.6856E-002;
+      }
       }
 
      clad {

@@ -240,6 +240,7 @@ contains
 
       ! Normalise population
       call self % nextCycle % normSize(self % pop, pRNG)
+      call self % nextCycle % normWeight(dble(self % pop))
 
       if(self % printSource == 1) then
         call self % nextCycle % printToFile(trim(self % outputFile)//'_source'//numToChar(i))
@@ -323,7 +324,7 @@ contains
     type(outputFile)                          :: out
     character(nameLen)                        :: name
 
-    call out % init(self % outputFormat, filename=self % outputFile)
+    call out % init(self % outputFormat)
 
     name = 'seed'
     call out % printValue(self % pRNG % getSeed(),name)
@@ -358,6 +359,8 @@ contains
     call out % startBlock(name)
     call self % activeTally % print(out)
     call out % endBlock()
+
+    call out % writeToFile(self % outputFile)
 
   end subroutine collectResults
 

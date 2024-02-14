@@ -99,7 +99,7 @@ module mgXsClerk_class
     ! File reports -> run-time procedures
     procedure  :: reportInColl
     procedure  :: reportOutColl
-    procedure  :: reportSpawn
+    procedure  :: reportCycleEnd
 
     ! Output procedures
     procedure  :: print
@@ -124,7 +124,7 @@ contains
 
     ! Assign name
     call self % setName(name)
-
+    
     ! Load energy map and bin number
     if (dict % isPresent('energyMap')) then
       call new_tallyMap(self % energyMap, dict % getDictPtr('energyMap'))
@@ -186,7 +186,7 @@ contains
     class(mgXsClerk),intent(in)                :: self
     integer(shortInt),dimension(:),allocatable :: validCodes
 
-    validCodes = [inColl_CODE, outColl_CODE, spawn_CODE]
+    validCodes = [inColl_CODE, outColl_CODE, cycleEnd_CODE]
 
   end function validReports
 
@@ -283,16 +283,16 @@ contains
   !! See tallyClerk_inter for details
   !!
   subroutine reportOutColl(self, p, MT, muL, xsData, mem)
-    class(mgXsClerk), intent(inout)      :: self
-    class(particle), intent(in)          :: p
-    integer(shortInt), intent(in)        :: MT
-    real(defReal), intent(in)            :: muL
-    class(nuclearDatabase),intent(inout) :: xsData
-    type(scoreMemory), intent(inout)     :: mem
-    type(particleState)                  :: preColl, postColl
-    real(defReal)                        :: score, prod, mu, mu2, mu3, mu4, mu5
-    integer(shortInt)                    :: enIdx, matIdx, binIdx, binEnOut
-    integer(longInt)                     :: addr
+    class(mgXsClerk), intent(inout) :: self
+    class(particle), intent(in)             :: p
+    integer(shortInt), intent(in)           :: MT
+    real(defReal), intent(in)               :: muL
+    class(nuclearDatabase),intent(inout)    :: xsData
+    type(scoreMemory), intent(inout)        :: mem
+    type(particleState)                     :: preColl, postColl
+    real(defReal)                           :: score, prod, mu, mu2, mu3, mu4, mu5
+    integer(shortInt)                       :: enIdx, matIdx, binIdx, binEnOut
+    integer(longInt)                        :: addr
 
     ! Get pre and post collision particle state
     preColl  = p % preCollision
@@ -406,37 +406,37 @@ contains
   end subroutine reportOutColl
 
   !!
-  !! Process fission report
+  !! Process end of the cycle to score fission spectrum with an analog estimator
   !!
   !! See tallyClerk_inter for details
   !!
-  subroutine reportSpawn(self, MT, pOld, pNew, xsData, mem)
-    class(mgXsClerk), intent(inout)       :: self
-    integer(shortInt), intent(in)         :: MT
-    class(particle), intent(in)           :: pOld
-    class(particleState), intent(in)      :: pNew
-    class(nuclearDatabase), intent(inout) :: xsData
-    type(scoreMemory), intent(inout)      :: mem
-    integer(longInt)                      :: addr, binIdx, enIdx, matIdx
+  subroutine reportCycleEnd(self, end, mem)
+    class(mgXsClerk), intent(inout)     :: self
+    class(particleDungeon), intent(in)  :: end
+    type(scoreMemory), intent(inout)    :: mem
+    integer(longInt)                    :: addr, binIdx, enIdx, matIdx
+    integer(shortInt)                   :: N, i
 
-    if (MT == N_FISSION) then
+    ! Loop over the whole neutron population
+    N = end % popSize()
+    do i = 1,N
 
       ! Find bin indexes
       ! Energy
       if (allocated(self % energyMap)) then
-        enIdx = self % energyN + 1 - self % energyMap % map(pNew)
+        enIdx = self % energyN + 1 - self % energyMap % map(end % get(i))
       else
         enIdx = 1
       end if
       ! Space
       if (allocated(self % spaceMap)) then
-        matIdx = self % spaceMap % map(pNew)
+        matIdx = self % spaceMap % map(end % get(i))
       else
         matIdx = 1
       end if
 
       ! Return if invalid bin index
-      if ((enIdx == self % energyN + 1) .or. matIdx == 0) return
+      if ((enIdx == self % energyN + 1) .or. matIdx == 0) cycle
 
       ! Calculate bin address
       binIdx = self % energyN * (matIdx - 1) + enIdx
@@ -445,9 +445,9 @@ contains
       ! Score energy group of fission neutron
       call mem % score(ONE,  addr + CHI_idx)
 
-    end if
+    end do
 
-  end subroutine reportSpawn
+  end subroutine reportCycleEnd
 
   !!
   !! Final processing to calculate the multi-group cross sections, fission data and
@@ -556,7 +556,7 @@ contains
 
       ! Store total cross section and flux for this energy group
       tot(i)    = capt_res(1,i) + fiss_res(1,i) + scattXS
-      totStd(i) = sqrt(capt_res(2,i)**2 + fiss_res(2,i)**2 + scattXSstd**2)
+      totStd(i) = sqrt(capt_res(2,i)**2 + fiss_res(1,i)**2 + scattXSstd**2)
       fluxG(i)  = flux
       fluxGstd(i) = fluxStd
 

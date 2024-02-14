@@ -157,7 +157,7 @@ contains
     ! Close batch
     if( mem % lastCycle() ) then
       k_norm = end % k_eff
-
+      k_norm = 1.0_defReal
       ! Calculate and score analog estimate of k-eff
       k_eff =  self % endPopWgt / self % startPopWgt * k_norm
       call mem % accumulate(k_eff, self % getMemAddress() )
