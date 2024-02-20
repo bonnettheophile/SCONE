@@ -100,6 +100,7 @@ module eigenPhysicsPackage_class
     type(particleDungeon), pointer :: thisCycle    => null()
     type(particleDungeon), pointer :: nextCycle    => null()
     type(particleDungeon), pointer :: temp_dungeon => null()
+    type(particleDungeon), pointer :: combed_dungeon => null()
 
     ! Timer bins
     integer(shortInt) :: timerMain
@@ -240,7 +241,8 @@ contains
 
       ! Normalise population
       call self % nextCycle % normSize(self % pop, pRNG)
-      call self % nextCycle % normWeight(dble(self % pop))
+      ! call self % nextCycle % normWeight(dble(self % pop))
+      ! call self % nextCycle % combing(pRNG)
 
       if(self % printSource == 1) then
         call self % nextCycle % printToFile(trim(self % outputFile)//'_source'//numToChar(i))

@@ -86,6 +86,7 @@ module particleDungeon_class
     procedure  :: isEmpty
     procedure  :: normWeight
     procedure  :: normSize
+    procedure  :: combing
     procedure  :: cleanPop
     procedure  :: popSize
     procedure  :: popWeight
@@ -435,6 +436,83 @@ contains
     end if
 
   end subroutine normSize
+
+  !! 
+  !! Randomly shuffle the prisoners to avoid eventual bias in weight combing
+  !! using Fisher-Yates method
+  !!
+  subroutine shuffle(self, rand)
+    class(particleDungeon), intent(inout) :: self
+    class(RNG), intent(inout)             :: rand
+    integer(shortInt)                     :: perm, i
+    type(particleState)                   :: temp
+    character(100), parameter :: Here =' shuffle (particleDungeon_class.f90)'
+
+
+    do i = 1, self % pop
+      perm = i + int(floor(rand % get() * (self % pop - i)))
+      temp = self % prisoners(i)
+      self % prisoners(i) = self % prisoners(perm)
+      self % prisoners(perm) = temp
+    end do
+  end subroutine shuffle
+
+  !! 
+  !! Apply weight combing to positive weight particles, breaks if negative weights exist
+  !! Apply after eventual weight normalization
+  !! target N is floor of total weight, and outgoing particles are appro unit weighted
+  !! rand -> random number gen
+  !!
+  subroutine combing(self, rand)
+    class(particleDungeon), intent(inout) :: self
+    class(RNG), intent(inout)             :: rand
+    real(defReal)                         :: tot_wgt, av_wgt, comb_pos, current_p
+    integer(shortInt)                     :: nTarget, i, j
+    type(particleDungeon), save           :: tmp
+    character(100), parameter :: Here =' combing (particleDungeon_class.f90)'
+    
+    if (.not. allocated(tmp % prisoners)) call tmp % init(size(self % prisoners))
+
+    ! Shuffle to avoid bias
+    call shuffle(self, rand)
+
+    ! Compute total weight
+    tot_wgt = sum(self % prisoners(1 : self % pop) % wgt)
+
+    ! Set target population size
+    nTarget = int(ceiling(tot_wgt))
+
+    ! Check for valid size
+    if( nTarget > size(self % prisoners)) then
+      call fatalError(Here,'Requested size: '//numToChar(nTarget) //&
+                           'is greather then max size: '//numToChar(size(self % prisoners)))
+    else if ( nTarget <= 0 ) then
+      call fatalError(Here,'Requested size: '//numToChar(nTarget) //' is not +ve')
+    end if
+
+    ! Set combing settings
+    av_wgt = tot_wgt / nTarget
+    comb_pos = rand % get() * av_wgt
+    current_p = 0.0_defReal
+
+    j = 1
+    ! Add combed particles to new dungeon
+    do i = 1, self % pop
+      current_p = current_p + self % prisoners(i) % wgt
+      do while (comb_pos < current_p)
+        tmp % prisoners(j) = self % prisoners(i)
+        tmp % prisoners(j) % wgt = av_wgt
+        comb_pos = comb_pos + av_wgt
+        j = j + 1
+      end do
+    end do
+    tmp % pop = j - 1
+
+    do i = 1, tmp % pop
+      self % prisoners(i) = tmp % prisoners(i)
+    end do
+    self % pop = tmp % pop
+  end subroutine combing
 
   !!
   !! Kill or particles in the dungeon
