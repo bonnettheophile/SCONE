@@ -34,6 +34,7 @@ module keffAnalogClerk_class
     private
     real(defReal) :: startPopWgt = ZERO
     real(defReal) :: endPopWgt   = ZERO
+    logical(defBool) :: normWgt = .false.
   contains
     ! Procedures used during build
     procedure :: init
@@ -77,6 +78,9 @@ contains
 
     ! Needs no settings, just load name
     call self % setName(name)
+
+    ! Set if no need for normalization due to branchless collisions
+    call dict % getOrDefault(self % normWgt, 'normalize', .true.)
 
     ! Ensure correct initialisation to default values
     self % startPopWgt = ZERO
@@ -157,7 +161,7 @@ contains
     ! Close batch
     if( mem % lastCycle() ) then
       k_norm = end % k_eff
-      k_norm = 1.0_defReal
+      if (.not. self % normWgt) k_norm = ONE
       ! Calculate and score analog estimate of k-eff
       k_eff =  self % endPopWgt / self % startPopWgt * k_norm
       call mem % accumulate(k_eff, self % getMemAddress() )

@@ -95,6 +95,7 @@ module eigenPhysicsPackage_class
     real(defReal)      :: keff_0
     integer(shortInt)  :: bufferSize
     logical(defBool)   :: UFS = .false.
+    integer(shortInt)  :: popControl = 0
 
     ! Calculation components
     type(particleDungeon), pointer :: thisCycle    => null()
@@ -240,9 +241,14 @@ contains
       end if
 
       ! Normalise population
-      call self % nextCycle % normSize(self % pop, pRNG)
-      ! call self % nextCycle % normWeight(dble(self % pop))
-      ! call self % nextCycle % combing(pRNG)
+      if (self % popControl == 0) then
+        call self % nextCycle % normSize(self % pop, pRNG)
+      else if (self % popControl == 1) then
+        call self % nextCycle % normWeight(dble(self % pop))
+      else
+        call self % nextCycle % normWeight(dble(self % pop))
+        call self % nextCycle % combing(pRNG)
+      end if
 
       if(self % printSource == 1) then
         call self % nextCycle % printToFile(trim(self % outputFile)//'_source'//numToChar(i))
@@ -380,7 +386,8 @@ contains
     character(10)                             :: time
     character(8)                              :: date
     character(:),allocatable                  :: string
-    character(nameLen)                        :: nucData, energy, geomName
+    character(nameLen)                        :: nucData, energy, geomName, popControl
+    integer(shortInt)                          :: keffNorm
     type(outputFile)                          :: test_out
     type(visualiser)                          :: viz
     class(field), pointer                     :: field
@@ -394,6 +401,20 @@ contains
     call dict % get( self % N_active,'active')
     call dict % get( nucData, 'XSdata')
     call dict % get( energy, 'dataType')
+    call dict % get( popControl, 'popControl')
+    call dict % getOrDefault( keffNorm, 'keffNormalize', 1)
+
+    ! Select population control technique
+    select case(popControl)
+      case('size')
+        self % popControl = 0
+      case('weight') 
+        self % popControl = 1
+      case('combing')
+        self % popControl = 2
+      case default
+        call fatalError(Here, "population control must be 'weight', 'size', or 'combing'.")
+    end select
 
     ! Parallel buffer size
     call dict % getOrDefault( self % bufferSize, 'buffer', 1000)
@@ -520,9 +541,10 @@ contains
     ! Initialise active and inactive tally attachments
     ! Inactive tally attachment
     call locDict1 % init(2)
-    call locDict2 % init(2)
+    call locDict2 % init(3)
 
     call locDict2 % store('type','keffAnalogClerk')
+    call locDict2 % store('normalize', keffNorm)
     call locDict1 % store('keff', locDict2)
     call locDict1 % store('display',['keff'])
 
