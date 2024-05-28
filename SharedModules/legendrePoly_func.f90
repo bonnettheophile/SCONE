@@ -15,19 +15,64 @@ module legendrePoly_func
 
   ! Public Interface
   public :: sampleLegendre
+  public :: evaluateLegendre
 
   ! Generic Interfaces
+
+  !! Evaluate value of Legendre polynomial of order n at given point
+  !! Might include different methods to compute the n-th Legendre polynomial
+  interface evaluateLegendre
+    module procedure evaluateLegendre_Pn
+  end interface evaluateLegendre
 
   !!
   !! Samples diffrent Legendre PDFs given number of coefficients and RNG
   !!   Diffrent Orders can use diffrent methods and have some limits on supported coefficients
   !!   Consult particular implementations for details
   !!
+
   interface sampleLegendre
     module procedure sampleLegendre_P1
   end interface sampleLegendre
 
 contains
+  
+  !! 
+  !! Function to compute recursively the n-th Legendre polynomial
+  !!
+  !! Return the vector for Legendre polynomials evaluated at "value" up to order n
+  !!
+  !! Args: 
+  !!   n [in] -> largest order of sought Legendre polynomials
+  !!   value [in] -> point at which to evaluate Legendre polynomials
+  !!
+  !! Return:
+  !!   array with the value of the polynomials evaluated at value
+  !! 
+  !! Error:
+  !!   fatalError if abs(value) > 1
+  function evaluateLegendre_Pn(n, value) result(val_vec)
+    integer(shortInt), intent(in)         :: n
+    real(defReal), intent(in)             :: value
+    real(defReal), dimension(max(2,n))    :: val_vec
+    integer(shortInt)                     :: i
+    character(100), parameter :: Here = 'evaluateLegendre_Pn ( legendrePoly_func.f90)'
+
+    ! Checks if value is valid
+    if (abs(value) > 1) call fatalError(Here, 'Legendre polynomials are defined in [-1,1]')
+
+    ! Return at least the first two polynomials, as there is no point in having n = 0
+    val_vec(1) = ONE
+    val_vec(2) = value
+
+    ! Computes up to n-th using Bonnet recurrence formula
+    do i = 3, n
+      val_vec(i) = ((2*i-1)*value*val_vec(i-1)-(i-1)*val_vec(i-2))/i
+    end do
+    
+  end function evaluateLegendre_Pn
+
+  
 
   !!
   !! Simple function to sample P1 Legendre PDF. Uses methods from Lux & Koblinger
