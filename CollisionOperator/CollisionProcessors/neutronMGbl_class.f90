@@ -55,6 +55,11 @@ module neutronMGbls_class
     private
     class(mgNeutronDatabase), pointer, public:: xsData => null()
     class(mgNeutronMaterial), pointer, public:: mat    => null()
+
+    !! Russian roulette and splitting settings
+    real(defReal) :: minWgt
+    real(defReal) :: maxWgt
+    real(defReal) :: avWgt
   contains
     ! Initialisation procedure
     procedure:: init
@@ -67,6 +72,10 @@ module neutronMGbls_class
     procedure:: capture
     procedure:: fission
     procedure:: cutoffs
+
+    ! Local procedures
+    procedure,private :: russianRoulette
+    procedure,private :: split
   end type neutronMGbls
 
 contains
@@ -81,6 +90,12 @@ contains
 
     ! Call superclass
     call init_super(self, dict)
+
+    ! Roulette and splitting settings
+
+    call dict % getOrDefault(self % minWgt, 'minWgt', 0.4_defReal)
+    call dict % getOrDefault(self % maxWgt, 'maxWgt', 2.0_defReal)
+    call dict % getOrDefault(self % avWgt, 'avWgt', 1.0_defReal)
 
   end subroutine init
 
@@ -260,11 +275,56 @@ contains
     class(neutronMGbls), intent(inout)   :: self
     class(particle), intent(inout)       :: p
     type(collisionData), intent(inout)   :: collDat
-    class(particleDungeon), intent(inout):: thisCycle
-    class(particleDungeon), intent(inout):: nextCycle
+    class(particleDungeon),intent(inout) :: thisCycle
+    class(particleDungeon),intent(inout) :: nextCycle
 
-    ! Do nothing
+
+    ! Splitting with fixed threshold
+    if ((p % w > self % maxWgt) .and. (p % isDead .eqv. .false.)) then
+      call self % split(p, thisCycle, self % maxWgt)
+    ! Roulette with fixed threshold and survival weight
+    elseif ((p % w < self % minWgt) .and. (p % isDead .eqv. .false.)) then
+      call self % russianRoulette(p, self % avWgt)
+    end if
 
   end subroutine cutoffs
+
+    !!
+  !! Perform Russian roulette on a particle
+  !!
+  subroutine russianRoulette(self, p, avWgt)
+    class(neutronMGbls), intent(inout):: self
+    class(particle), intent(inout)     :: p
+    real(defReal), intent(in)          :: avWgt
+
+    if (p % pRNG % get() < (ONE-p % w/avWgt)) then
+      p % isDead = .true.
+    else
+      p % w = avWgt
+    end if
+
+  end subroutine russianRoulette
+
+  !!
+  !! Split particle which has too large a weight
+  !!
+  subroutine split(self, p, thisCycle, maxWgt)
+    class(neutronMGbls), intent(inout)    :: self
+    class(particle), intent(inout)        :: p
+    class(particleDungeon), intent(inout):: thisCycle
+    real(defReal), intent(in)             :: maxWgt
+    integer(shortInt)                     :: mult, i
+
+    ! This value must be at least 2
+    mult = ceiling(p % w/maxWgt)
+    ! Decrease weight
+    p % w = p % w/mult
+
+    ! Add split particle's to the dungeon
+    do i = 1, mult-1
+      call thisCycle % detain(p)
+    end do
+
+  end subroutine split
 
 end module neutronMGbls_class
