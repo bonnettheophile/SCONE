@@ -206,7 +206,7 @@ contains
 
       ! Assign uniform random variable vector
       if (self % isMG) then
-        allocate(rand4(nucData % nG,3))
+        allocate(rand4(nucData % nG,4))
         do j = 1, nucData % nG 
           do k = 1, 4
             rand4(i,j) = 2* rand % get() - 1

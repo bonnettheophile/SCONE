@@ -54,8 +54,7 @@ module multiScatterMG_class
   !!
   type, public, extends(reactionMG) :: multiScatterMG
     real(defReal),dimension(:),allocatable    :: scatterXSs
-    real(defReal),dimension(:),allocatable    :: scatterXSs_sigma
-    real(defReal),dimension(:,:),allocatable  :: P0, P0_sigma
+    real(defReal),dimension(:,:),allocatable  :: P0
     real(defReal), dimension(:,:),allocatable :: prod
   contains
     ! Superclass procedures
@@ -113,7 +112,6 @@ contains
 
     ! Clean memory
     if(allocated(self % scatterXSs)) deallocate(self % scatterXSs)
-    if(allocated(self % scatterXSs_sigma)) deallocate(self % scatterXSs_sigma)
     if(allocated(self % P0))         deallocate(self % P0)
     if(allocated(self % prod))       deallocate(self % prod)
 
@@ -336,17 +334,6 @@ contains
                            ' got: '//numToChar(size(temp)))
     end if
     self % P0 = reshape(temp,[nG, nG])
-
-    ! Read scattering uncertainty matrix
-    if (dict % isPresent('P0_sigma')) then
-      call dict % get(temp, 'P0_sigma')
-      if( size(temp) /= nG*nG) then
-        call fatalError(Here,'Invalid size of P0_sigma. Expected: '//numToChar(nG**2)//&
-                             ' got: '//numToChar(size(temp)))
-      end if
-      self % P0_sigma = reshape(temp,[nG, nG])
-      self % scatterXSs_sigma = sum(self % P0_sigma, 1)
-    end if
 
     ! Read production matrix
     call dict % get(temp, 'scatteringMultiplicity')

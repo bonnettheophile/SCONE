@@ -164,8 +164,7 @@ contains
 
     ! Get XSs
     xss % elasticScatter   = ZERO
-    ! xss % inelasticScatter = self % data(IESCATTER_XS, G) + X(1) * self % data_sigma(IESCATTER_XS, G)
-    xss % inelasticScatter = self % data(IESCATTER_XS, G)
+    xss % inelasticScatter = self % data(IESCATTER_XS, G) + X(G, 4) * self % data_sigma(IESCATTER_XS, G)
     xss % capture          = self % data(CAPTURE_XS, G) + X(G, 1) * self % data_sigma(CAPTURE_XS, G)
 
     ! Careful about nu : do not use fissionMG % release when using uncertain nu
@@ -180,7 +179,8 @@ contains
       xss % nuFission      = ZERO
     end if
 
-    xss % total            = xss % elasticScatter + xss % inelasticScatter + xss % capture + xss % fission
+    xss % total            = xss % elasticScatter + xss % inelasticScatter &
+                              + xss % capture + xss % fission
   end subroutine getMacroXSs_uncertain
 
     !!
@@ -204,8 +204,7 @@ contains
     end if
     
     xs = ZERO
-    ! xs = xs + self % data(IESCATTER_XS, G) + X(1) * self % data_sigma(IESCATTER_XS, G)
-    xs = xs + self % data(IESCATTER_XS, G)
+    xs = xs + self % data(IESCATTER_XS, G) + X(G, 4) * self % data_sigma(IESCATTER_XS, G)
     xs = xs + self % data(CAPTURE_XS, G) + X(G, 2) * self % data_sigma(CAPTURE_XS, G)
     if (self % isFissile()) xs = xs + self % data(FISSION_XS, G) + X(G, 3) * self % data_sigma(FISSION_XS, G)
 
@@ -347,7 +346,7 @@ contains
       end if
     end do
 
-    ! Load uncertainty on cross sections (Careful, in practice ignore IESCATTERING and NU for now)
+    ! Load uncertainty on cross sections
     if (dict % isPresent('capture_sigma')) then
       call dict % get(temp, 'capture_sigma')
       if(size(temp) /= nG) then
@@ -360,9 +359,14 @@ contains
       self % data_sigma(CAPTURE_XS,:) = ZERO
     end if
 
-    ! Get uncertainty on scattering XS (as the column-wise sum of the uncertainties in P0...)
+    ! Get uncertainty on group scattering XS and keeps the same emission spectrum
     if (dict % isPresent('scatter_sigma')) then 
-      self % data_sigma(IESCATTER_XS,:) = self % scatter % scatterXSs_sigma
+      call dict % get(temp, 'scatter_sigma')
+      if(size(temp) /= nG) then
+        call fatalError(Here,'Scattering XSs uncertainties have wong size. Must be: ' &
+                          // numToChar(nG)//' is '//numToChar(size(temp)))
+      end if
+      self % data_sigma(IESCATTER_XS,:) = temp
       self % data_sigma(TOTAL_XS, :) = self % data_sigma(TOTAL_XS, :) + temp
     else
       self % data_sigma(IESCATTER_XS,:) = ZERO

@@ -23,7 +23,7 @@ inactiveTally {
 activeTally  {
                 display (kAnalog);
                 kAnalog {type keffAnalogClerk; normalize 0;}
-                kgpc {type kgpcAnalogClerk; order 3; params 3;}
+                kgpc {type kgpcAnalogClerk; order 3; params 4;}
         }
 
 geometry {
