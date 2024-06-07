@@ -27,7 +27,7 @@ module keffAnalogClerk_class
   !! SAMPLE DICTIOANRY INPUT:
   !!
   !! myClerk {
-  !!   type keffAnalogClerk;
+  !!   type keffAnalogClerk; normalize 0;
   !! }
   !!
   type, public,extends(tallyClerk) :: keffAnalogClerk
@@ -170,6 +170,7 @@ contains
       self % endPopWgt   = ZERO
     end if
 
+
   end subroutine reportCycleEnd
 
   !!
@@ -226,7 +227,6 @@ contains
 
     ! Get result value
     call mem % getResult(k, STD, self % getMemAddress())
-
     allocate(res, source = keffResult([k, STD]))
 
   end subroutine getResult

@@ -10,7 +10,7 @@ module neutronXsPackages_class
 
   implicit none
   private
-
+  
   !!
   !! Neutron MACROscopic Reaction XSS
   !!
@@ -35,6 +35,7 @@ module neutronXsPackages_class
     real(defReal):: capture          = ZERO
     real(defReal):: fission          = ZERO
     real(defReal):: nuFission        = ZERO
+    real(defReal):: nu               = ZERO
   contains
     procedure:: clean => clean_neutronMacroXSs
     procedure:: add   => add_neutronMacroXSs
@@ -154,6 +155,9 @@ contains
 
       case(macroAbsorbtion)
         xs = self % fission+self % capture
+
+      case(macroNu)
+        xs = self % nu
 
       case default
         xs = ZERO

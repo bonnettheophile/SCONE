@@ -102,7 +102,8 @@ module endfConstants
                                   macroEscatter  = -3 ,&
                                   macroIEscatter = -4 ,&
                                   macroFission   = -6 ,&
-                                  macroNuFission = -7
+                                  macroNuFission = -7 ,&
+                                  macroNu        = -8
 
   ! List of Macro MT numbers for macroscopic XSs. Unique to SCONE (not from Serpent)
   integer(shortInt), parameter :: macroAllScatter = -20 ,&

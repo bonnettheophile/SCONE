@@ -155,8 +155,10 @@ contains
     type(fissionCE), pointer             :: fissCE
     type(fissionMG), pointer             :: fissMG
     real(defReal), dimension(3)          :: r, rand3
+    real(defReal), dimension(:,:), allocatable          :: rand4
     real(defReal)                        :: mu, phi, E_out, E_up, E_down
     integer(shortInt)                    :: matIdx, uniqueID, nucIdx, i, G_out
+    integer(shortInt)                    :: j,k   
     character(100), parameter :: Here = 'sampleParticle (fissionSource_class.f90)'
 
     ! Get pointer to appropriate nuclear database
@@ -201,6 +203,18 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
+
+      ! Assign uniform random variable vector
+      if (self % isMG) then
+        allocate(rand4(nucData % nG,3))
+        do j = 1, nucData % nG 
+          do k = 1, 4
+            rand4(i,j) = 2* rand % get() - 1
+          end do
+        end do
+      end if
+      p % X    = rand4
+      p % oldX = rand4
 
       ! Set Energy
       select type (nucData)

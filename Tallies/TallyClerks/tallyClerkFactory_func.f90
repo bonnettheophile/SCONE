@@ -19,6 +19,7 @@ module tallyClerkFactory_func
   use centreOfMassClerk_class,         only : centreOfMassClerk
   use mgXsClerk_class,                 only : mgXsClerk
   use fissionSourceClerk_class,        only : fissionSourceClerk
+  use kgpcAnalogClerk_class,         only : kgpcAnalogClerk
 
   implicit none
   private
@@ -29,7 +30,7 @@ module tallyClerkFactory_func
   ! It is printed if type was unrecognised
   ! NOTE:
   ! For now  it is necessary to adjust trailing blanks so all enteries have the same length
-  character(nameLen),dimension(*),parameter :: AVALIBLE_tallyClerks = [ 'keffAnalogClerk          ',&
+  character(nameLen),dimension(*),parameter :: AVALAIBLE_tallyClerks = [ 'keffAnalogClerk          ',&
                                                                         'keffImplicitClerk        ',&
                                                                         'collisionClerk           ',&
                                                                         'collisionProbabilityClerk',&
@@ -39,7 +40,8 @@ module tallyClerkFactory_func
                                                                         'centreOfMassClerk        ',&
                                                                         'dancoffBellClerk         ',&
                                                                         'mgXsClerk                ',&
-                                                                        'fissionSourceClerk       ']
+                                                                        'fissionSourceClerk       ',&
+                                                                        'kgpcAnalogClerk          ']
 
 contains
 
@@ -95,8 +97,11 @@ contains
      case('fissionSourceClerk')
        allocate(fissionSourceClerk :: new)
 
+     case('kgpcAnalogClerk')
+       allocate(kgpcAnalogClerk :: new)
+
       case default
-        print *, AVALIBLE_tallyClerks
+        print *, AVALAIBLE_tallyClerks
         call fatalError(Here, 'Unrecognised type of tallyClerk: ' // trim(type))
 
     end select

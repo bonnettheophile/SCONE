@@ -31,6 +31,7 @@ module nuclearDatabase_inter
   !!   kill          -> return to uninitialised state, clean memory
   !!
   type, public,abstract :: nuclearDatabase
+  integer(shortInt)  :: nG = 0
   contains
     procedure(init), deferred          :: init
     procedure(activate), deferred      :: activate

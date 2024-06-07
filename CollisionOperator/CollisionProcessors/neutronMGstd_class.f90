@@ -111,7 +111,7 @@ contains
     if(.not.associated(self % mat)) call fatalError(Here, "Failed to get MG Neutron Material")
 
     ! Select Main reaction channel
-    call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG)
+    call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG, p % X)
     r = p % pRNG % get()
 
     collDat % MT = macroXSs % invert(r)
@@ -131,7 +131,8 @@ contains
     type(fissionMG),pointer              :: fission
     type(particleState)                  :: pTemp
     real(defReal),dimension(3)           :: r, dir
-    integer(shortInt)                    :: G_out, n, i
+    real(defReal),dimension(:,:),allocatable           :: rand4 
+    integer(shortInt)                    :: G_out, n, i, j, k
     real(defReal)                        :: wgt, w0, rand1, mu, phi
     real(defReal)                        :: sig_tot, k_eff, sig_nufiss
     character(100),parameter :: Here = 'implicit (neutronMGstd_class.f90)'
@@ -143,7 +144,7 @@ contains
       k_eff = p % k_eff            ! k_eff for normalisation
       rand1 = p % pRNG % get()     ! Random number to sample sites
 
-      call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG)
+      call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG, p % X)
 
       sig_tot    = macroXSs % total
       sig_nuFiss = macroXSs % nuFission
@@ -175,6 +176,14 @@ contains
         pTemp % dir = dir
         pTemp % G   = G_out
         pTemp % wgt = wgt
+        
+      allocate(rand4, MOLD=p % X)
+      do j = 1, size(p % X, 2)
+        do k = 1, size(p % X, 1)
+          rand4(k,j) = 2* p % pRNG % get() - 1
+        end do
+      end do
+        p % X    = rand4
 
         call nextCycle % detain(pTemp)
       end do

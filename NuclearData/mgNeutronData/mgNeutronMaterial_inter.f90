@@ -42,12 +42,15 @@ module mgNeutronMaterial_inter
   contains
     ! Superclass procedures
     procedure :: kill
-    generic   :: getMacroXSs => getMacroXSs_byG
+    generic   :: getMacroXSs => getMacroXSs_byG, getMacroXSs_uncertain
+    generic   :: getTotalXS => getTotalXS_det, getTotalXS_uncertain
     procedure :: getMacroXSs_byP
 
     ! Local procedures
     procedure(getMacroXSs_byG), deferred    :: getMacroXSs_byG
-    procedure(getTotalXS), deferred         :: getTotalXS
+    procedure(getMacroXSs_uncertain), deferred :: getMacroXSs_uncertain
+    procedure(getTotalXS_det), deferred         :: getTotalXS_det
+    procedure(getTotalXS_uncertain), deferred         :: getTotalXS_uncertain
     procedure                               :: isFissile
     procedure                               :: set
 
@@ -77,6 +80,27 @@ module mgNeutronMaterial_inter
     end subroutine getMacroXSs_byG
 
     !!
+    !! Return Macroscopic XSs for uncertain material
+    !!
+    !! Args:
+    !!   xss [out]    -> Cross section package to store the data
+    !!   G [in]       -> Requested energy group
+    !!   rand [inout] -> Random Number Generator
+    !!   X [in]       -> Vector of uniform random variables
+    !!
+    !! Errors:
+    !!   fatalError if G is out-of-bounds for the stored data
+    !!
+    subroutine getMacroXSs_uncertain(self, xss, G, rand, X)
+      import :: mgNeutronMaterial, neutronMacroXSs, shortInt, RNG, defReal
+      class(mgNeutronMaterial), intent(in)    :: self
+      type(neutronMacroXSs), intent(out)      :: xss
+      integer(shortInt), intent(in)           :: G
+      class(RNG), intent(inout)               :: rand
+      real(defReal), dimension(:,:), intent(in) :: X
+    end subroutine getMacroXSs_uncertain
+
+    !!
     !! Return Macroscopic Total XS for the material
     !!
     !! Args:
@@ -86,13 +110,33 @@ module mgNeutronMaterial_inter
     !! Errors:
     !!   fatalError if G is out-of-bounds for the stored data
     !!
-    function getTotalXS(self, G, rand) result(xs)
+    function getTotalXS_det(self, G, rand) result(xs)
       import :: mgNeutronMaterial, defReal, shortInt, RNG
       class(mgNeutronMaterial), intent(in) :: self
       integer(shortInt), intent(in)        :: G
       class(RNG), intent(inout)            :: rand
       real(defReal)                        :: xs
-    end function getTotalXS
+    end function getTotalXS_det
+
+    !!
+    !! Return uncertain Macroscopic Total XS for the material
+    !!
+    !! Args:
+    !!   G [in]       -> Requested energygroup
+    !!   rand [inout] -> Random number generator
+    !!   X [in]       -> Vector of uniform random variables
+    !!
+    !! Errors:
+    !!   fatalError if G is out-of-bounds for the stored data
+    !!
+    function getTotalXS_uncertain(self, G, rand, X) result(xs)
+      import :: mgNeutronMaterial, defReal, shortInt, RNG
+      class(mgNeutronMaterial), intent(in) :: self
+      integer(shortInt), intent(in)        :: G
+      class(RNG), intent(inout)            :: rand
+      real(defReal)                        :: xs
+      real(defReal), dimension(:,:), intent(in) :: X
+    end function getTotalXS_uncertain
   end interface
 
 
@@ -111,7 +155,7 @@ contains
     character(100), parameter :: Here = 'getMacroXSs_byP (mgNeutronMateerial_inter.f90)'
 
     if( p % isMG) then
-      call self % getMacroXSs(xss, p % G, p % pRNG)
+      call self % getMacroXSs(xss, p % G, p % pRNG, p % X)
 
     else
       call fatalError(Here, 'CE particle was given to MG data')

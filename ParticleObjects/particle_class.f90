@@ -54,6 +54,10 @@ module particle_class
     integer(shortInt)          :: matIdx   = -1     ! Material index where particle is
     integer(shortInt)          :: cellIdx  = -1     ! Cell idx at the lowest coord level
     integer(shortInt)          :: uniqueID = -1     ! Unique id at the lowest coord level
+    real(defReal),dimension(:,:), allocatable :: X
+    real(defReal),dimension(:,:), allocatable :: oldX
+    real(defReal)              :: k_eff
+
   contains
     generic    :: assignment(=)  => fromParticle
     generic    :: operator(.eq.) => equal_particleState
@@ -100,6 +104,8 @@ module particle_class
     integer(shortInt)          :: G         ! Particle Energy Group
     real(defReal)              :: w         ! Particle Weight
     real(defReal)              :: time      ! Particle time point
+    real(defReal), dimension(:,:), allocatable :: X
+    real(defReal), dimension(:,:), allocatable :: oldX
     
     ! Particle flags
     real(defReal)              :: w0             ! Particle initial weight (for implicit, variance reduction...)
@@ -221,7 +227,7 @@ contains
   !!   t   -> particle time (default = 0.0)
   !!   type-> particle type (default = P_NEUTRON)
   !!
-  subroutine buildMG(self, r, dir, G, w, t, type)
+  subroutine buildMG(self, r, dir, G, w, t, type, X, oldX)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
@@ -229,6 +235,8 @@ contains
     integer(shortInt),intent(in)            :: G
     real(defReal),intent(in),optional       :: t
     integer(shortInt),intent(in),optional   :: type
+    real(defReal),dimension(:,:),intent(in),optional :: X
+    real(defReal),dimension(:,:),intent(in),optional :: oldX
 
     call self % coords % init(r, dir)
     self % G  = G
@@ -250,6 +258,9 @@ contains
       self % type = P_NEUTRON
     end if
 
+    if(present(X)) self % X = X
+    if(present(X)) self % oldX = X
+
   end subroutine buildMG
 
   !!
@@ -269,6 +280,9 @@ contains
     LHS % isMG                  = RHS % isMG
     LHS % type                  = RHS % type
     LHS % time                  = RHS % time
+    LHS % X                     = RHS % X
+    LHS % oldX                  = RHS % oldX
+    LHS % k_eff                 = RHS % k_eff
 
   end subroutine particle_fromParticleState
 
@@ -606,6 +620,9 @@ contains
     LHS % isMG = RHS % isMG
     LHS % type = RHS % type
     LHS % time = RHS % time
+    LHS % X    = RHS % X
+    LHS % oldX = RHS % oldX
+    LHS % k_eff = RHS % k_eff
 
     ! Save all indexes
     LHS % matIdx   = RHS % coords % matIdx
@@ -699,6 +716,10 @@ contains
     self % matIdx   = -1
     self % cellIdx  = -1
     self % uniqueID = -1
+    self % k_eff = ZERO
+    if (allocated(self % X)) deallocate(self % X)
+    if (allocated(self % oldX)) deallocate(self % oldX)
+
 
   end subroutine kill_particleState
 

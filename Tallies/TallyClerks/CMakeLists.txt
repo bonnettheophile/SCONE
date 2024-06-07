@@ -13,6 +13,7 @@ add_sources(./tallyClerk_inter.f90
             ./centreOfMassClerk_class.f90
             ./mgXsClerk_class.f90
             ./fissionSourceClerk_class.f90
+            ./kgpcAnalogClerk_class.f90
              )
              
 add_unit_tests(./Tests/collisionClerk_test.f90

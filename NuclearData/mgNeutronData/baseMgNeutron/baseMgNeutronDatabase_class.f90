@@ -108,7 +108,7 @@ contains
     integer(shortInt), intent(in)               :: matIdx
     real(defReal)                               :: xs
 
-    xs = self % mats(matIdx) % getTotalXS(p % G, p % pRNG)
+    xs = self % mats(matIdx) % getTotalXS(p % G, p % pRNG, p % X)
 
   end function getTotalMatXS
 
@@ -323,7 +323,7 @@ contains
       xs = ZERO
       do i = 1,size(self % activeMats)
         idx = self % activeMats(i)
-        xs = max(xs, self % mats(idx) % data(TOTAL_XS, g))
+        xs = max(xs, self % mats(idx) % data(TOTAL_XS, g) + self % mats(idx) % data_sigma(TOTAL_XS, g))
       end do
       self % majorant(g) = xs
     end do

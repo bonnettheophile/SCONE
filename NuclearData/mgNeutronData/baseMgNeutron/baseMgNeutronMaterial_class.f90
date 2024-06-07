@@ -34,6 +34,7 @@ module baseMgNeutronMaterial_class
   integer(shortInt), parameter, public :: CAPTURE_XS    = 3
   integer(shortInt), parameter, public :: FISSION_XS    = 4
   integer(shortInt), parameter, public :: NU_FISSION    = 5
+  integer(shortInt), parameter, public :: NU            = 6
 
   !!
   !! Basic type of MG material data
@@ -69,14 +70,18 @@ module baseMgNeutronMaterial_class
   !!
   type, public, extends(mgNeutronMaterial) :: baseMgNeutronMaterial
     real(defReal),dimension(:,:), allocatable :: data
+    real(defReal),dimension(:,:), allocatable :: data_sigma
     class(multiScatterMG), allocatable        :: scatter
+    class(multiScatterMG), allocatable        :: scatter_sigma
     type(fissionMG), allocatable              :: fission
 
   contains
     ! Superclass procedures
     procedure :: kill
     procedure :: getMacroXSs_byG
-    procedure :: getTotalXS
+    procedure :: getTotalXS_det
+    procedure :: getMacroXSs_uncertain
+    procedure :: getTotalXS_uncertain
 
     ! Local procedures
     procedure :: init
@@ -97,6 +102,7 @@ contains
 
     ! Kill local content
     if(allocated(self % data))    deallocate(self % data)
+    if(allocated(self % data_sigma))    deallocate(self % data_sigma)
     if(allocated(self % scatter)) deallocate(self % scatter)
     if(allocated(self % fission)) deallocate(self % fission)
 
@@ -137,16 +143,85 @@ contains
   end subroutine getMacroXSs_byG
 
   !!
+  !! Load uncertain Macroscopic XSs into the provided package for a given group index G
+  !!
+  !! See mgNeutronMaterial documentation for more details
+  !!
+  subroutine getMacroXSs_uncertain(self, xss, G, rand, X)
+    class(baseMgNeutronMaterial), intent(in)    :: self
+    type(neutronMacroXSs), intent(out)      :: xss
+    integer(shortInt), intent(in)           :: G
+    class(RNG), intent(inout)               :: rand
+    real(defReal), dimension(:,:), intent(in) :: X
+    character(100), parameter :: Here = ' getMacroXSs_uncertain (baseMgNeutronMaterial_class.f90)'
+
+
+    ! Verify bounds
+    if(G < 1 .or. self % nGroups() < G) then
+      call fatalError(Here,'Invalid group number: '//numToChar(G)// &
+                           ' Data has only: ' // numToChar(self % nGroups()))
+    end if
+
+    ! Get XSs
+    xss % elasticScatter   = ZERO
+    ! xss % inelasticScatter = self % data(IESCATTER_XS, G) + X(1) * self % data_sigma(IESCATTER_XS, G)
+    xss % inelasticScatter = self % data(IESCATTER_XS, G)
+    xss % capture          = self % data(CAPTURE_XS, G) + X(G, 1) * self % data_sigma(CAPTURE_XS, G)
+
+    ! Careful about nu : do not use fissionMG % release when using uncertain nu
+    if(self % isFissile()) then
+      xss % fission        = self % data(FISSION_XS, G) + X(G, 2) * self % data_sigma(FISSION_XS, G)
+      xss % nu             = self % data(NU, G) + X(G, 3) * self % data_sigma(NU, G)
+      xss % nu             = self % data(NU, G)
+      xss % nuFission      = xss % fission * xss % nu
+    else
+      xss % fission        = ZERO
+      xss % nu             = ZERO
+      xss % nuFission      = ZERO
+    end if
+
+    xss % total            = xss % elasticScatter + xss % inelasticScatter + xss % capture + xss % fission
+  end subroutine getMacroXSs_uncertain
+
+    !!
+  !! Return uncertain Total XSs for energy group G
+  !!
+  !! See mgNeutronMaterial documentationfor details
+  !!
+  function getTotalXS_uncertain(self, G, rand, X) result(xs)
+    class(baseMgNeutronMaterial), intent(in) :: self
+    integer(shortInt), intent(in)            :: G
+    class(RNG), intent(inout)                :: rand
+    real(defReal), dimension(:,:), intent(in)  :: X
+    real(defReal)                            :: xs
+    character(100), parameter :: Here = ' getTotalXs_uncertain (baseMgNeutronMaterial_class.f90)'
+
+    ! Verify bounds
+    if (G < 1 .or. self % nGroups() < G) then
+      call fatalError(Here,'Invalid group number: '//numToChar(G)// &
+                           ' Data has only: ' // numToChar(self % nGroups()))
+      xs = ZERO ! Avoid warning
+    end if
+    
+    xs = ZERO
+    ! xs = xs + self % data(IESCATTER_XS, G) + X(1) * self % data_sigma(IESCATTER_XS, G)
+    xs = xs + self % data(IESCATTER_XS, G)
+    xs = xs + self % data(CAPTURE_XS, G) + X(G, 2) * self % data_sigma(CAPTURE_XS, G)
+    if (self % isFissile()) xs = xs + self % data(FISSION_XS, G) + X(G, 3) * self % data_sigma(FISSION_XS, G)
+
+  end function getTotalXS_uncertain
+
+  !!
   !! Return Total XSs for energy group G
   !!
   !! See mgNeutronMaterial documentationfor details
   !!
-  function getTotalXS(self, G, rand) result(xs)
+  function getTotalXS_det(self, G, rand) result(xs)
     class(baseMgNeutronMaterial), intent(in) :: self
     integer(shortInt), intent(in)            :: G
     class(RNG), intent(inout)                :: rand
     real(defReal)                            :: xs
-    character(100), parameter :: Here = ' getTotalXS (baseMgNeutronMaterial_class.f90)'
+    character(100), parameter :: Here = ' getTotalXS_det (baseMgNeutronMaterial_class.f90)'
 
     ! Verify bounds
     if (G < 1 .or. self % nGroups() < G) then
@@ -156,7 +231,7 @@ contains
     end if
     xs = self % data(TOTAL_XS, G)
 
-  end function getTotalXS
+  end function getTotalXS_det
 
 
   !!
@@ -221,12 +296,13 @@ contains
 
     ! Allocate space for data
     if(self % isFissile()) then
-      N = 5
+      N = 6
     else
       N = 3
     end if
 
     allocate(self % data(N, nG))
+    allocate(self % data_sigma(N, nG))
 
     ! Load cross sections
     call dict % get(temp, 'capture')
@@ -260,6 +336,7 @@ contains
                             // numToChar(nG)//' is '//numToChar(size(temp)))
       end if
       self % data(NU_FISSION,:) = temp * self % data(FISSION_XS,:)
+      self % data(NU, :) = temp 
     end if
 
     ! Calculate total XS
@@ -269,6 +346,55 @@ contains
         self % data(TOTAL_XS, i) = self % data(TOTAL_XS, i) + self % data(FISSION_XS, i)
       end if
     end do
+
+    ! Load uncertainty on cross sections (Careful, in practice ignore IESCATTERING and NU for now)
+    if (dict % isPresent('capture_sigma')) then
+      call dict % get(temp, 'capture_sigma')
+      if(size(temp) /= nG) then
+        call fatalError(Here,'Capture XSs uncertainties have wong size. Must be: ' &
+                          // numToChar(nG)//' is '//numToChar(size(temp)))
+      end if
+      self % data_sigma(CAPTURE_XS,:) = temp
+      self % data_sigma(TOTAL_XS, :) = self % data_sigma(TOTAL_XS, :) + temp
+    else
+      self % data_sigma(CAPTURE_XS,:) = ZERO
+    end if
+
+    ! Get uncertainty on scattering XS (as the column-wise sum of the uncertainties in P0...)
+    if (dict % isPresent('scatter_sigma')) then 
+      self % data_sigma(IESCATTER_XS,:) = self % scatter % scatterXSs_sigma
+      self % data_sigma(TOTAL_XS, :) = self % data_sigma(TOTAL_XS, :) + temp
+    else
+      self % data_sigma(IESCATTER_XS,:) = ZERO
+    end if
+
+    ! Load Fission-data uncertainties
+    if( self % isFissile()) then
+      if (dict % isPresent('fission_sigma')) then 
+        ! Load Fission
+        call dict % get(temp, 'fission_sigma')
+        if(size(temp) /= nG) then
+          call fatalError(Here,'Fission XSs uncertainties have wong size. Must be: ' &
+                            // numToChar(nG)//' is '//numToChar(size(temp)))
+        end if
+        self % data_sigma(FISSION_XS,:) = temp
+        self % data_sigma(TOTAL_XS, :) = self % data_sigma(TOTAL_XS, :) + temp
+      else
+        self % data_sigma(FISSION_XS,:) = ZERO
+      end if
+
+      ! Load nu uncertainties
+      if (dict % isPresent('nu_sigma')) then 
+        call dict % get(temp, 'nu_sigma')
+        if(size(temp) /= nG) then
+          call fatalError(Here,'Nu uncertainty vector has wong size. Must be: ' &
+                            // numToChar(nG)//' is '//numToChar(size(temp)))
+        end if
+        self % data_sigma(NU,:) = temp
+      else
+        self % data_sigma(NU,:) = ZERO
+      end if
+    end if
   end subroutine init
 
   !!

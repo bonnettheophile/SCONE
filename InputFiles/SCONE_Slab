@@ -1,13 +1,15 @@
 type eigenPhysicsPackage;
 
-pop      15000;
+pop      150000;
+popControl combing;
+keffNormalize 1;
 active   1000;
 inactive 200;
 XSdata   mg;
 dataType mg;
 
 collisionOperator { neutronCE {type neutronCEstd;}
-                    neutronMG {type neutronMGstd;}
+                    neutronMG {type neutronMGbls;}
                   }
 
 transportOperator { type transportOperatorST;
@@ -19,6 +21,8 @@ inactiveTally {
 activeTally  {
                 norm    fiss;
                 normVal 100;
+                display ( kAnalog );
+                kAnalog {type keffAnalogClerk; normalize 1;}
                 fiss { type collisionClerk; response (fiss); fiss {type macroResponse; MT -6;}}
         }
 

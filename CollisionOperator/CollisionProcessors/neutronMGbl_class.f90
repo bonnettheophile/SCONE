@@ -126,7 +126,7 @@ contains
     if(.not.associated(self % mat)) call fatalError(Here, "Failed to get MG Neutron Material")
 
     ! Select Main reaction channel
-    call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG)
+    call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG, p % X)
     r = p % pRNG % get()
     
     ! Call branchless collide procedure instead of regular
@@ -147,7 +147,7 @@ contains
     real(defReal)                        :: effectiveXStot, weight_modifier
     character(100), parameter:: Here = 'implicit (neutronMGbls_class.f90)'
 
-    call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG)
+    call self % mat % getMacroXSs(macroXSs, p % G, p % pRNG, p % X)
     
     ! Compute effective total cross section for branchless collisions
     effectiveXStot = macroXSs % elasticScatter+macroXSs % inelasticScatter &
@@ -231,12 +231,12 @@ contains
     type(collisionData), intent(inout)   :: collDat
     class(particleDungeon), intent(inout):: thisCycle
     class(particleDungeon), intent(inout):: nextCycle
-    type(fissionMG), pointer:: fission_reaction
-    type(particleState):: pTemp
-    real(defReal), dimension(3):: r, dir
-    real(defReal):: mu, phi, w0
-    integer(shortInt):: fission_yield
-    integer(shortInt):: g_out, i
+    type(fissionMG), pointer             :: fission_reaction
+    type(particleState)                  :: pTemp
+    real(defReal), dimension(3)          :: r, dir
+    real(defReal), dimension(:,:), allocatable  :: rand4
+    real(defReal)                        :: mu, phi, w0
+    integer(shortInt)                    :: g_out, j, k
     character(100), parameter:: Here = 'fission (neutronMGbls_class.f90)'
 
     ! Get Fission reaction object
@@ -246,24 +246,31 @@ contains
     ! Store new sites in the next cycle dungeon
 
     w0 = p % preHistory % wgt
-    fission_yield = int(abs(p % pRNG % get() + p % w / (p % k_eff * w0)),kind=shortInt)
-    do i = 1, fission_yield
-      r   = p % rGlobal()
-      call fission_reaction % sampleOut(mu, phi, G_out, p % G, p % pRNG)
-      dir = rotateVector(p % dirGlobal(), mu, phi)
+    allocate(rand4, MOLD=p % X)
 
-      ! Copy extra detail from parent particle (i.e. time, flags ect.)
-      pTemp       = p
+    r   = p % rGlobal()
+    call fission_reaction % sampleOut(mu, phi, G_out, p % G, p % pRNG)
+    dir = rotateVector(p % dirGlobal(), mu, phi)
 
-      ! Overwrite position, direction, energy group
-      pTemp % r   = r
-      pTemp % dir = dir
-      pTemp % G   = G_out
-      pTemp % wgt = 1.0
+    ! Copy extra detail from parent particle (i.e. time, flags ect.)
+    pTemp       = p
 
-      call nextCycle % detain(pTemp)
+    ! Overwrite position, direction, energy group
+    pTemp % r   = r
+    pTemp % dir = dir
+    pTemp % G   = G_out
+    pTemp % wgt = p % w
+    pTemp % k_eff = p % w / w0
+    pTemp % oldX = p % X
+
+    do j = 1, size(p % X, 2)
+      do k = 1, size(p % X, 1)
+        rand4(k,j) = 2* p % pRNG % get() - 1
+      end do
     end do
+    pTemp % X    = rand4
 
+    call nextCycle % detain(pTemp)
     p % isDead = .true.
 
   end subroutine fission
@@ -280,12 +287,12 @@ contains
 
 
     ! Splitting with fixed threshold
-    if ((p % w > self % maxWgt) .and. (p % isDead .eqv. .false.)) then
-      call self % split(p, thisCycle, self % maxWgt)
+    !if ((p % w > self % maxWgt) .and. (p % isDead .eqv. .false.)) then
+    !  call self % split(p, thisCycle, self % maxWgt)
     ! Roulette with fixed threshold and survival weight
-    elseif ((p % w < self % minWgt) .and. (p % isDead .eqv. .false.)) then
-      call self % russianRoulette(p, self % avWgt)
-    end if
+    !elseif ((p % w < self % minWgt) .and. (p % isDead .eqv. .false.)) then
+    !  call self % russianRoulette(p, self % avWgt)
+    !end if
 
   end subroutine cutoffs
 

@@ -279,6 +279,7 @@ contains
     name ='Res'
     call outFile % startArray(name, resArrayShape)
 
+    print *, self % getMemAddress()
     ! Print results to the file
     do i=1,product(resArrayShape)
       call mem % getResult(val, std, self % getMemAddress() - 1 + i)

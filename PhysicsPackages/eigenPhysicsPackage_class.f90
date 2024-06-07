@@ -201,7 +201,7 @@ contains
           call self % geom % placeCoord(neutron % coords)
 
           ! Set k-eff for normalisation in the particle
-          neutron % k_eff = k_new
+          ! neutron % k_eff = k_new
 
           ! Save state
           call neutron % savePreHistory()
@@ -243,6 +243,7 @@ contains
       ! Normalise population
       if (self % popControl == 0) then
         call self % nextCycle % normSize(self % pop, pRNG)
+        call self % nextCycle % normWeight(dble(self % pop))
       else if (self % popControl == 1) then
         call self % nextCycle % normWeight(dble(self % pop))
       else

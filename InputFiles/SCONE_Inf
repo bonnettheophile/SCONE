@@ -1,29 +1,29 @@
 type eigenPhysicsPackage;
 
-pop      15000;
-active   500;
-inactive 100;
+pop      1000000;
+active   100;
+popControl combing;
+keffNormalize 0;
+inactive 1;
 XSdata   mg;
 dataType mg;
+outputFormat asciiJSON;
+outputFile /home/tbonnet/code/SCONE/build/output;
 
 collisionOperator { neutronCE {type neutronCEstd;}
                     neutronMG {type neutronMGbls;}
                   }
 
-transportOperator { type transportOperatorDT;
+transportOperator { type transportOperatorST;
                   }
 
 inactiveTally {
               }
 
 activeTally  {
-                norm    fiss;
-                normVal 100;
-                fiss { type collisionClerk; response (fiss); fiss {type macroResponse; MT -6;}}
-                flux { type collisionClerk;
-                       map { type energyMap; grid log; min 0.001; max 20; N 300;}
-                       response (flux); flux {type fluxResponse;}
-                     }
+                display (kAnalog);
+                kAnalog {type keffAnalogClerk; normalize 0;}
+                kgpc {type kgpcAnalogClerk; order 3; params 3;}
         }
 
 geometry {
@@ -33,7 +33,7 @@ geometry {
 
     surfaces
     {
-      squareBound { id 1; type box; origin ( 0.0  0.0  0.0); halfwidth (10.0 10.0 10.0); }
+      squareBound { id 1; type box; origin ( 0.0  0.0  0.0); halfwidth (5.1855325 10.0 10.0); }
     }
 
 
@@ -58,7 +58,7 @@ nuclearData {
 
   handles {
      ce { type aceNeutronDatabase; aceLibrary $SCONE_ACE;}
-     mg { type baseMgNeutronDatabase; PN P1;}
+     mg { type baseMgNeutronDatabase; PN P0;}
   }
 
 
@@ -69,7 +69,7 @@ materials {
       composition {
         92235.03  0.037047;
       }
-      xsFile /home/tbonnet/code/SCONE/InputFiles/XS/URRa_2_1_XSS;
+      xsFile /home/tbonnet/code/SCONE/InputFiles/XS/one_group;
     }
 
 }

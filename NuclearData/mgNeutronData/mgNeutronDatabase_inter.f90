@@ -24,7 +24,6 @@ module mgNeutronDatabase_inter
   !!   nG -> number of energy groups
   !!
   type, public, abstract, extends(nuclearDatabase) :: mgNeutronDatabase
-    integer(shortInt)  :: nG = 0
   end type mgNeutronDatabase
 
 contains
