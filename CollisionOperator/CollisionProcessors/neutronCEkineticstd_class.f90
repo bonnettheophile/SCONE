@@ -239,7 +239,7 @@ contains
     if (.not.associated(fiss)) call fatalError(Here, "Failed to get fissionCE")
     sig_nufiss = fiss % releasePrompt(p % E) * microXSs % fission
 
-    n = fiss % sampleNPromptPoisson(p % E, p % pRNG) * p % w
+    n = fiss % sampleNPromptPoisson(p % E, p % pRNG)
 
     if (n >= 1) then
       ! Store new sites in the next cycle dungeon
@@ -273,7 +273,7 @@ contains
 
     if (self % usePrecursors) then
 
-      n = fiss % sampleNDelayedPoisson(p % E, p % pRNG) * p % w
+      n = fiss % sampleNDelayedPoisson(p % E, p % pRNG)
 
       if (n >= 1) then
         wgt =  sign(w0, wgt)
@@ -380,29 +380,28 @@ contains
     end if
 
     ! Apply weigth change
-    p % w = p % w * reac % release(p % E)
-    if (p % w /= ONE) p % hasN2N = .true.
-    call splitting (self, p, thisCycle)
+    ! p % w = p % w * reac % release(p % E)
+    if (p % w == 2) p % hasN2N = .true.
+    call splitting (self, p, nextCycle)
 
   end subroutine inelastic
 
   ! Split particle to limit effect of non-analog scattering
   ! Add split particle to this cycle
-  subroutine splitting(self, p, thisCycle)
+  subroutine splitting(self, p, nextCycle)
     class(neutronCEkineticstd), intent(inout) :: self
     class(particle), intent(inout)            :: p
-    class(particleDungeon), intent(inout)     :: thisCycle
+    class(particleDungeon), intent(inout)     :: nextCycle
     integer(shortInt)                         :: mult, i
 
     ! This value is necessarily entire
     mult = int(p % w)
-
     ! Put back weight to unit
     p % w = ONE
 
     ! Add split particle's to the dungeon
     do i = 1,mult-1
-      call thisCycle % detain(p)
+      call nextCycle % detain(p)
     end do
 
   end subroutine splitting
