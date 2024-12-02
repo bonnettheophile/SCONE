@@ -106,6 +106,9 @@ module scoreMemory_class
     generic   :: accumulate => accumulate_defReal, accumulate_shortInt, accumulate_longInt
     generic   :: getResult  => getResult_withSTD, getResult_withoutSTD
     procedure :: getScore
+    procedure :: setScore
+    procedure :: setBin
+    procedure :: getBin
     procedure :: closeCycle
     procedure :: closeBin
     procedure :: lastCycle
@@ -300,6 +303,45 @@ contains
     call self % accumulate_defReal(real(score, defReal), idx)
 
   end subroutine accumulate_longInt
+
+  ! Set a bin to specified value for current thread, for use during generation
+  subroutine setBin(self, val, idx)
+    class(scoreMemory), intent(inout) :: self
+    real(defReal), intent(in)         :: val
+    integer(longInt), intent(in)      :: idx
+    integer(shortInt)                 :: id
+    character(100),parameter :: Here = 'setBin (scoreMemory_class.f90)'
+
+
+    if( idx < 0_longInt .or. idx > self % N) then
+      call fatalError(Here,'Index '//numToChar(idx)//' is outside bounds of &
+                            & memory with size '//numToChar(self % N))
+    end if
+
+    id = ompGetThreadNum() + 1
+    self % parallelBins(idx, id) = val
+
+  end subroutine setBin
+
+  ! Get the value of a specific bin for current thread, for use during generation
+  subroutine getBin(self, val, idx)
+    class(scoreMemory), intent(inout) :: self
+    real(defReal), intent(out)         :: val
+    integer(longInt), intent(in)      :: idx
+    integer(shortInt)                 :: id
+    character(100),parameter :: Here = 'getBin (scoreMemory_class.f90)'
+
+
+    if( idx < 0_longInt .or. idx > self % N) then
+      call fatalError(Here,'Index '//numToChar(idx)//' is outside bounds of &
+                            & memory with size '//numToChar(self % N))
+    end if
+
+    id = ompGetThreadNum() + 1
+    val = self % parallelBins(idx, id)
+
+  end subroutine getBin
+
 
   !!
   !! Close Cycle
@@ -618,5 +660,14 @@ contains
     end if
 
   end function getScore
+
+  subroutine setScore(self, idx, value)
+    class(scoreMemory), intent(inout) :: self
+    integer(longInt), intent(in)      :: idx
+    real(defReal), intent(in)         :: value
+
+    self % parallelBins(idx, :) = value
+
+  end subroutine setSCore
 
 end module scoreMemory_class

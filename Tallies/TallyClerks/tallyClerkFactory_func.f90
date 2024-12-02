@@ -21,6 +21,11 @@ module tallyClerkFactory_func
   use kAlphaAnalogClerk_class,         only : kAlphaAnalogClerk
   use removalTimeClerk_class,          only : removalTimeClerk
   use mgXsClerk_class,                 only : mgXsClerk
+  use coeffOfChaosClerk_class,         only : coeffOfChaosClerk
+  use implicitChaosClerk_class,        only : implicitChaosClerk
+  use keffXClerk_class,                only : keffXClerk
+  use fissionSourceClerk_class,        only : fissionSourceClerk
+  use uncertainProbClerk_class,        only : uncertainProbClerk
 
   implicit none
   private
@@ -43,7 +48,12 @@ module tallyClerkFactory_func
                                                                         'dancoffBellClerk         ',&
                                                                         'kAlphaAnalogClerk        ',&
                                                                         'removalTimeClerk         ',&
-                                                                        'mgXsClerk                ']
+                                                                        'mgXsClerk                ',&
+                                                                        'coeffOfChaosClerk        ',&
+                                                                        'implicitChaosClerk       ',&
+                                                                        'keffXClerk               ',&
+                                                                        'fissionSourceClerk       ',&
+                                                                        'uncertainProbClerk       ']
 
 contains
 
@@ -104,6 +114,21 @@ contains
 
      case('mgXsClerk')
        allocate(mgXsClerk :: new)
+     
+     case('coeffOfChaosClerk')
+       allocate(coeffOfChaosClerk :: new)
+      
+      case('implicitChaosClerk')
+        allocate(implicitChaosClerk :: new)
+      
+      case('keffXClerk')
+        allocate(keffXClerk :: new)
+
+      case ('fissionSourceClerk')
+        allocate(fissionSourceClerk :: new)
+      
+      case ('uncertainProbClerk')
+        allocate(uncertainProbClerk :: new)
 
       case default
         print *, AVALIBLE_tallyClerks

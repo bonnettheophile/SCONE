@@ -11,6 +11,7 @@ add_sources(./tallyMap_inter.f90
             ./Maps1D/materialMap_class.f90
             ./Maps1D/homogMatMap_class.f90
             ./Maps1D/weightMap_class.f90
+            ./Maps1D/uncertainMap_class.f90
             ./Maps1D/cellMap_class.f90
 	    ./Maps1D/radialMap_class.f90
 	    ./Maps1D/timeMap_class.f90

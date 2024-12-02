@@ -88,6 +88,22 @@ contains
     ! Provide geometry info to source
     self % geom => geom
 
+    ! Get parameter for virtual density coefficient generation
+    call dict % get(temp, 'eps')
+    self % eps = temp
+
+    call dict % getOrDefault(type, 'gpcPert', 'none')
+    select case(type)
+      case('isotropic')
+        self % gpcPert = 0
+      case('radial')
+        self % gpcPert = 1
+      case('axial')
+        self % gpcPert = 2
+      case default
+        self % gpcPert = -1
+    end select
+
     ! Select Energy Type
     call dict % getOrDefault(type, 'data', 'ce')
     select case(type)
@@ -211,6 +227,23 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
+      if (self % gpcPert == 0) then
+        p % X    = TWO * rand % get() - ONE
+        p % gpcPert = 1
+      else if (self % gpcPert == 1) then
+        p % X(:2) = TWO * rand % get() - ONE
+        p % X(3) = ZERO
+        p % gpcPert = 1
+      else if (self % gpcPert == 2) then
+        p % X(:2) = ZERO
+        p % X(3) = TWO * rand % get() - ONE
+        p % gpcPert = 3
+      else 
+        p % X = ZERO
+      end if
+      
+      p % f        = ONE + p % X * self % eps
+      
 
       ! Set Energy
       select type (nucData)
@@ -242,7 +275,7 @@ contains
           p % dir  = rotateVector([ONE, ZERO, ZERO], mu, phi)
 
           ! Apply upper energy cut-off
-          if (p % E > E_up) p % E = E_up
+          p % E = min(p % E, E_up)
 
         class is (mgNeutronDatabase)
           ! Get reaction object
@@ -283,6 +316,7 @@ contains
     self % top    = ZERO
     self % E      = ZERO
     self % G      = 0
+    self % eps    = ZERO
 
   end subroutine kill
 

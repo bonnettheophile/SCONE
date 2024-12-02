@@ -62,7 +62,7 @@ module eigenPhysicsPackage_class
   ! Tallies
   use tallyCodes
   use tallyAdmin_class,               only : tallyAdmin
-  use tallyResult_class,              only : tallyResult
+  use tallyResult_class,              only : tallyResult, polyResult
   use keffAnalogClerk_class,          only : keffResult
 
   ! Factories
@@ -107,6 +107,7 @@ module eigenPhysicsPackage_class
     integer(shortInt)  :: bufferSize
     logical(defBool)   :: UFS = .false.
     logical(defBool)   :: reproducible = .true.
+    logical(defBool)   :: polyChaos = .false.
 
     ! Calculation components
     type(particleDungeon), pointer :: thisCycle    => null()
@@ -265,10 +266,18 @@ contains
       end if
 
       ! Normalise population
-      if (self % reproducible) then
+      if (self % reproducible .and. .not. self % polyChaos) then
         call self % nextCycle % normSize_Repr(self % totalPop, self % pRNG)
-      else
+      else if (.not.self % polyChaos) then
         call self % nextCycle % normSize_notRepr(self % pop, self % pRNG)
+      else
+        call tallyAtch % getResult(res, "uncertainFit")
+        select type(res)
+          type is(polyResult)
+            call self % nextCycle % importanceCombing(self % pRNG, res % coefficients, self % pop)
+          class default
+            call fatalError(Here, 'Invalid result has been returned')
+        end select
       end if
 
       ! Update RNG after it was used to normalise particle population
@@ -418,9 +427,12 @@ contains
     class(eigenPhysicsPackage), intent(inout) :: self
     class(dictionary), intent(inout)          :: dict
     class(dictionary),pointer                 :: tempDict
-    type(dictionary)                          :: locDict1, locDict2
+    type(dictionary)                          :: locDict1, locDict2, locDict3, locDict4
     integer(shortInt)                         :: seed_temp
     integer(longInt)                          :: seed
+    integer(shortInt)                         :: int_temp
+    character(nameLen)                        :: char_temp
+    real(defReal), allocatable                :: eps_temp(:)
     character(10)                             :: time
     character(8)                              :: date
     character(:),allocatable                  :: string
@@ -445,6 +457,7 @@ contains
 
     ! Check if the calculation has to be reproducible with MPI
     call dict % getOrDefault(self % reproducible, 'reproducible', .true.)
+    call dict % getOrDefault(self % polyChaos, 'polyChaos', .false.)
 
     ! Parallel buffer size
     call dict % getOrDefault(self % bufferSize, 'buffer', 1000)
@@ -589,27 +602,85 @@ contains
     allocate(self % activeTally)
     call self % activeTally % init(tempDict)
 
-    ! Load Initial source
-    if (dict % isPresent('source')) then ! Load definition from file
-      call new_source(self % initSource, dict % getDictPtr('source'), self % geom)
+    ! If polyChaos is activated, change fissionSource and define dict for uncertainProbClerks
+    if (dict % isPresent('polyChaos')) then
+      tempDict => dict % getDictPtr('polyChaos')
+      self % polyChaos = .true.
+      ! Ignore an eventual separate user defined fission source
+      if (dict % isPresent('source')) then 
+        print *, "Polynomial Chaos calculation: ignoring user defined source"
+      end if
 
+      ! Initialise dictionary for fissionSource initial condition
+      call locDict3 % init(5)
+      call locDict3 % store('type', 'fissionSource')
+      call locDict3 % store('data', trim(energy))
+
+      ! Check if range of uncertain parameters is present
+      if (tempDict % isPresent('eps')) then
+        call tempDict % get(eps_temp, 'eps')
+        call locDict3 % store('eps', eps_temp)
+      else
+        call fatalError(Here, 'polyChaos is set and no epsilon vector is provided')
+      end if
+
+      ! Check if geometrical perturbation kind is properly set
+      if (tempDict % isPresent('type')) then
+        call tempDict % get(char_temp, 'type')
+        call locDict3 % store('gpcPert', char_temp)
+      else
+        call fatalError(Here, 'polyChaos is set and no type is provided')
+      end if
+
+      ! Initialise dictionary for settings uncertainProbClerks
+      call locDict4 % init(4)
+      call locDict4 % store('type', 'uncertainProbClerk')
+
+      ! Check if fitOrder is provided
+      if (tempDict % isPresent('fitOrder')) then
+        call tempDict % get(int_temp, 'fitOrder')
+        call locDict4 % store('fitOrder', int_temp)
+      else
+        call fatalError(Here, 'polyChaos is set and no fitOrder is provided')
+      end if
+
+      ! Check if map for the histogram of the uncertain distribution is provided
+      if (tempDict % isPresent('map')) then
+        call locDict4 % store('map', tempDict % getDictPtr('map'))
+      else
+        call fatalError(Here, 'polyChaos is set and no map is provided')
+      end if
+    end if
+
+    ! Load Initial source, if not doing polyChaos
+    if (dict % isPresent('source') .and. .not. self % polyChaos) then ! Load definition from file
+      call new_source(self % initSource, dict % getDictPtr('source'), self % geom)
+    ! Load polyChaos source
+    else if (self % polyChaos) then
+      call new_source(self % initSource, locDict3, self % geom)
+      call locDict3 % kill()
+    ! Load default source if nothing is provided and not doing polyChaos
     else
       call locDict1 % init(3)
       call locDict1 % store('type', 'fissionSource')
       call locDict1 % store('data', trim(energy))
       call new_source(self % initSource, locDict1, self % geom)
       call locDict1 % kill()
-
     end if
 
     ! Initialise active and inactive tally attachments
     ! Inactive tally attachment
-    ! Note: mpiSync ensures that k_eff is synchronised between all processes each cycle
     call locDict1 % init(3)
     call locDict2 % init(2)
 
     call locDict2 % store('type','keffAnalogClerk')
     call locDict1 % store('keff', locDict2)
+
+    ! Load uncertainProbClerk for active tallies
+    if (self % polyChaos) then
+      call locDict1 % store('uncertainFit', locDict4)
+    end if
+
     call locDict1 % store('display',['keff'])
     call locDict1 % store('mpiSync', 1)
 
@@ -626,12 +697,21 @@ contains
 
     call locDict2 % store('type','keffImplicitClerk')
     call locDict1 % store('keff', locDict2)
+
+    ! Load uncertainProbClerk for inactive tallies
+    if (self % polyChaos) then
+      call locDict4 % store('inactive', 1)
+      call locDict1 % store('uncertainFit', locDict4)
+    end if
+
     call locDict1 % store('display',['keff'])
     call locDict1 % store('mpiSync', 1)
 
     allocate(self % activeAtch)
     call self % activeAtch % init(locDict1)
 
+    call locDict4 % kill()
+    call locDict3 % kill()
     call locDict2 % kill()
     call locDict1 % kill()
 

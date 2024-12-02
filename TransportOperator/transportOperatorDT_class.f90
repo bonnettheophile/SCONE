@@ -32,18 +32,25 @@ module transportOperatorDT_class
   !! Transport operator that moves a particle with delta tracking
   !!
   type, public, extends(transportOperator) :: transportOperatorDT
+!   Data definitions for virtual density module  !
+    real(defReal)                    :: product_factor 
+    real(defReal), dimension(3)      :: vector_factor, vector_factor_cur
+    logical(defBool)                 :: virtual_density, cross_over = .false.
+    character(nameLen)               :: deform_type, direction_type, scale_type
+    character(nameLen), allocatable  :: pert_mat(:)
+    integer(shortInt), allocatable   :: pert_mat_id(:)
+    integer(shortInt)                :: nb_pert_mat
+!   Data definitions for virtual density module  !
   contains
     procedure :: transit => deltaTracking
-    ! Override procedure
+!   Virtual density addition  !
     procedure :: init
+!   Virtual density addition  !
 
   end type transportOperatorDT
 
 contains
 
-  !!
-  !! Performs delta tracking until a real collision point is found
-  !!
   subroutine deltaTracking(self, p, tally, thisCycle, nextCycle)
     class(transportOperatorDT), intent(inout) :: self
     class(particle), intent(inout)            :: p
@@ -51,37 +58,61 @@ contains
     class(particleDungeon), intent(inout)     :: thisCycle
     class(particleDungeon), intent(inout)     :: nextCycle
     real(defReal)                             :: majorant_inv, sigmaT, distance, speed, time
-    character(100), parameter :: Here = 'deltaTracking (transportOperatorDT_class.f90)'
+    character(100), parameter :: Here = 'deltaTracking (transportOIperatorDT_class.f90)'
+    character(100) :: scale
+!   Data definitions for virtual density module  !
+    real(defReal),dimension(3)                :: cosines,virtual_cosines, real_vector, virtual_vector, preCosines
+    real(defReal)                             :: virtual_dist, flight_stretch_factor
 
-    ! Get majorant XS inverse: 1/Sigma_majorant
+!   Data definitions for virtual density end here!
+
+    ! Get majorat XS inverse: 1/Sigma_majorant
     majorant_inv = ONE / self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS)
+    preCosines = p % dirGlobal()
+
+    scale = trim(self % scale_type)
 
     ! Should never happen! Prevents Inf distances
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
     DTLoop:do
-      distance = -log( p% pRNG % get() ) * majorant_inv
-        
-      speed = p % getSpeed()
-      time = distance / speed + p % time
+      distance = -log( p % pRNG % get() ) * majorant_inv
+      if (self % virtual_density) then
+        cosines(:) = preCosines
+        real_vector = distance * cosines
 
-      ! Set a max flight distance due to hitting the time-boundary
-      if (p % timeMax > ZERO .and. time > p % timeMax) then
-        distance = speed * (p % timeMax - p % time)
-        p % fate = AGED_FATE
-      end if
-
-      ! Move particle in the geometry and time
-      call self % geom % teleport(p % coords, distance)
-      p % time = p % time + distance / speed
+        if (self % deform_type == 'swelling') then
+          virtual_vector(1) = real_vector(1) * self % vector_factor(2) * self % vector_factor(3)
+          virtual_vector(2) = real_vector(2) * self % vector_factor(1) * self % vector_factor(3)
+          virtual_vector(3) = real_vector(3) * self % vector_factor(1) * self % vector_factor(2)
+          virtual_dist = sqrt(sum(virtual_vector**2))
+          flight_stretch_factor = virtual_dist / distance
+          virtual_cosines(1) = cosines(1) * self % vector_factor(2) * self % vector_factor(3) / flight_stretch_factor
+          virtual_cosines(2) = cosines(2) * self % vector_factor(1) * self % vector_factor(3) / flight_stretch_factor
+          virtual_cosines(3) = cosines(3) * self % vector_factor(1) * self % vector_factor(2) / flight_stretch_factor
+        elseif (self % deform_type == 'expansion') then
+          virtual_vector = real_vector / self % vector_factor
+          virtual_dist = sqrt(sum(virtual_vector**2))
+          flight_stretch_factor = virtual_dist/distance
+          virtual_cosines = cosines / (self % vector_factor*flight_stretch_factor)
+        else
+          print *,'Error in recognizing type of geometric deformation! Please check input!'
+        end if
       
-      select case(p % matIdx())
+        call p % point(virtual_cosines)
+        distance = virtual_dist
+      end if
+    ! Move partice in the geometry
 
-        ! If particle has leaked exit
-        case(OUTSIDE_FILL)
-          p % fate = LEAK_FATE
-          p % isDead = .true.
-          exit DTLoop
+      call self % geom % teleport(p % coords, distance)   
+      call p % point(preCosines)  
+
+      ! If particle has leaked exit
+      if (p % matIdx() == OUTSIDE_FILL) then
+        p % fate = LEAK_FATE
+        p % isDead = .true.
+        return
+      end if
 
         ! Check for void
         case(VOID_MAT)
@@ -113,6 +144,7 @@ contains
       call self % localConditions(p)
       
       ! Obtain the local cross-section
+      
       sigmaT = self % xsData % getTrackMatXS(p, p % matIdx())
 
       ! Roll RNG to determine if the collision is real or virtual
@@ -124,24 +156,33 @@ contains
       end if
 
     end do DTLoop
-
+    
     call tally % reportTrans(p)
-
   end subroutine deltaTracking
 
-  !!
-  !! Initialise DT transport operator
-  !!
-  !! See transportOperator_inter for more details
-  !!
   subroutine init(self, dict)
     class(transportOperatorDT), intent(inout) :: self
     class(dictionary), intent(in)             :: dict
+    real(defReal), allocatable                :: vec(:)
+    character(100), parameter                 :: Here = 'init (transportOperatorDT_class.f90)'
+         !Virtual Density Data call  begins !
 
-    ! Initialise superclass
     call init_super(self, dict)
+    call dict % getorDefault(self % virtual_density, 'virtual_density', .false.)
+      if (self % virtual_density) then
+        call dict % getorDefault(self % deform_type, 'deform_type_1','swelling')
+        call dict % getorDefault(self % direction_type, 'direction_type','isotropic')
+        call dict % getorDefault(self % scale_type, 'scale','uniform')
+        call dict % get(vec, "factor_1")
+        self % vector_factor = vec
 
+        self % product_factor = product(self % vector_factor)
+
+        if (trim(self % scale_type) == 'non_uniform') then
+          call fatalError(Here, "Delta tracking cannot be used with non-uniform virtual densities")
+        end if
+      end if
+!    Virtual Density Data call  ends !
   end subroutine init
-
-
+  
 end module transportOperatorDT_class

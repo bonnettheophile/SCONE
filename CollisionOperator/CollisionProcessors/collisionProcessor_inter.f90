@@ -61,6 +61,9 @@ module collisionProcessor_inter
   !!
   type, public, abstract :: collisionProcessor
     private
+    real(defReal), dimension(3), public :: eps ! Parameter for sampling virtual density parameters
+    logical(defBool), public            :: isotropic_pert ! Flag for isotropic/anisotropic virtual density
+    logical(defBool) , public           :: gpc ! Flag for activating gpc
   contains
     ! Master non-overridable procedures
     procedure, non_overridable :: collide
@@ -201,7 +204,6 @@ contains
     class(collisionProcessor), intent(inout) :: self
     class(dictionary), intent(in)            :: dict
 
-    ! For now does nothing
 
   end subroutine init
   

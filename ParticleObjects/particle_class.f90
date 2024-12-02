@@ -54,6 +54,7 @@ module particle_class
     real(defReal)              :: E    = ZERO       ! Energy
     integer(shortInt)          :: G    = 0          ! Energy group
     logical(defBool)           :: isMG = .false.    ! Is neutron multi-group
+    logical(defBool)           :: isPerturbed = .false.
     integer(shortInt)          :: type = P_NEUTRON  ! Particle physical type
     real(defReal)              :: time = ZERO       ! Particle time position
     real(defReal)              :: lambda = INF      ! Precursor decay constant
@@ -73,6 +74,11 @@ module particle_class
   !!   display        -> Print debug information about the state to the console
   !!
   type, public, extends(particleStateData) :: particleState
+    real(defReal), dimension(3):: f = ONE   ! Virtual density coefficients
+    real(defReal), dimension(3):: X = ZERO  ! Value of random variable underlying f
+    integer(shortInt)          :: gpcPert = 0 ! Kind of geometrical perturbation
+    real(defReal)              :: k_eff ! k_eff used for implicit fission generation
+
   contains
     generic    :: assignment(=)  => fromParticle
     generic    :: assignment(=)  => fromParticleStateData
@@ -122,11 +128,16 @@ module particle_class
     real(defReal)              :: w0             ! Particle initial weight (for implicit, variance reduction...)
     logical(defBool)           :: isDead
     logical(defBool)           :: isMG
+    logical(defBool)           :: isPerturbed, lastPerturbed
+    integer(shortInt)          :: startPerturbed
     real(defReal)              :: timeMax = -INF ! Maximum neutron time before cut-off
     integer(shortInt)          :: fate = NO_FATE ! Neutron's fate after being subjected to an operator
     integer(shortInt)          :: type           ! Particle type
     integer(shortInt)          :: collisionN = 0 ! Index of the number of collisions the particle went through
     integer(shortInt)          :: broodID = 0    ! ID of the brood (source particle number)
+    real(defReal), dimension(3):: f = ONE   ! Virtual density coefficients
+    real(defReal), dimension(3):: X = ZERO  ! Value of random variable underlying f
+    integer(shortInt)          :: gpcPert = 0 ! Kind of geometrical perturbation
 
     ! Particle processing information
     class(RNG), pointer        :: pRNG  => null()   ! Pointer to RNG associated with the particle
@@ -211,14 +222,17 @@ contains
   !!   t   -> particle time (default = 0.0)
   !!   type-> particle type (default = P_NEUTRON)
   !!
-  pure subroutine buildCE(self, r, dir, E, w, t, type)
+  pure subroutine buildCE(self, r, dir, E, w, f, X, t, type, gpcPert)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
     real(defReal),intent(in)                :: E
     real(defReal),intent(in)                :: w
+    real(defReal),dimension(3), intent(in), optional :: f
+    real(defReal),dimension(3), intent(in), optional :: X
     real(defReal),optional,intent(in)       :: t
     integer(shortInt),intent(in),optional   :: type
+    integer(shortInt),intent(in),optional   :: gpcPert
 
     call self % coords % init(r, dir)
     self % E  = E
@@ -227,6 +241,7 @@ contains
 
     self % isDead = .false.
     self % isMG   = .false.
+    self % isPerturbed = .false.
 
     if(present(t)) then
       self % time = t
@@ -238,6 +253,22 @@ contains
       self % type = type
     else
       self % type = P_NEUTRON
+    end if
+
+    if (present(f)) then
+      self % f = f
+    else
+      self % f = ONE
+    end if
+
+    if (present(X)) then
+      self % X = X
+    else
+      self % X = ZERO
+    end if
+
+    if (present(gpcPert)) then
+      self % gpcPert = gpcPert
     end if
 
   end subroutine buildCE
@@ -253,14 +284,17 @@ contains
   !!   t   -> particle time (default = 0.0)
   !!   type-> particle type (default = P_NEUTRON)
   !!
-  subroutine buildMG(self, r, dir, G, w, t, type)
+  subroutine buildMG(self, r, dir, G, w, f, X, t, type, gpcPert)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
+    real(defReal),dimension(3),intent(in), optional   :: f
+    real(defReal),dimension(3),intent(in), optional   :: X
     real(defReal),intent(in)                :: w
     integer(shortInt),intent(in)            :: G
     real(defReal),intent(in),optional       :: t
     integer(shortInt),intent(in),optional   :: type
+    integer(shortInt),intent(in),optional   :: gpcPert
 
     call self % coords % init(r, dir)
     self % G  = G
@@ -269,6 +303,7 @@ contains
 
     self % isDead = .false.
     self % isMG   = .true.
+    self % isPerturbed = .false.
 
     if(present(t)) then
       self % time = t
@@ -280,6 +315,22 @@ contains
       self % type = type
     else
       self % type = P_NEUTRON
+    end if
+
+    if (present(f)) then
+      self % f = f
+    else
+      self % f = ONE
+    end if
+
+    if (present(X)) then
+      self % X = X
+    else
+      self % X = ZERO
+    end if
+
+    if (present(gpcPert)) then
+      self % gpcPert = gpcPert
     end if
 
   end subroutine buildMG
@@ -296,11 +347,16 @@ contains
     call LHS % takeAboveGeom()
     LHS % coords % lvl(1) % r   = RHS % r
     LHS % coords % lvl(1) % dir = RHS % dir
+    LHS % f                     = RHS % f
+    LHS % X                     = RHS % X
+    LHS % gpcPert               = RHS % gpcPert
     LHS % E                     = RHS % E
     LHS % G                     = RHS % G
     LHS % isMG                  = RHS % isMG
+    LHS % isPerturbed           = RHS % isPerturbed
     LHS % type                  = RHS % type
     LHS % time                  = RHS % time
+    LHS % k_eff                 = RHS % k_eff
     LHS % lambda                = RHS % lambda
     LHS % fate                  = NO_FATE
     LHS % collisionN            = RHS % collisionN
@@ -817,11 +873,16 @@ contains
     LHS % wgt  = RHS % w
     LHS % r    = RHS % rGlobal()
     LHS % dir  = RHS % dirGlobal()
+    LHS % f    = RHS % f
+    LHS % X    = RHS % X
+    LHS % gpcPert = RHS % gpcPert
     LHS % E    = RHS % E
     LHS % G    = RHS % G
     LHS % isMG = RHS % isMG
+    LHS % isPerturbed = RHS % isPerturbed
     LHS % type = RHS % type
     LHS % time = RHS % time
+    LHS % k_eff = RHS % k_eff
     LHS % lambda = RHS % lambda
 
     ! Save all indexes
@@ -871,14 +932,19 @@ contains
     isEqual = isEqual .and. LHS % wgt == RHS % wgt
     isEqual = isEqual .and. all(LHS % r   == RHS % r)
     isEqual = isEqual .and. all(LHS % dir == RHS % dir)
+    isEqual = isEqual .and. all(LHS % f == RHS % f)
+    isEqual = isEqual .and. all(LHS % X == RHS % X)
+    isEqual = isEqual .and. LHS % gpcPert == RHS % gpcPert
     isEqual = isEqual .and. LHS % time == RHS % time
     isEqual = isEqual .and. LHS % isMG .eqv. RHS % isMG
+    isEqual = isEqual .and. LHS % isPerturbed .eqv. RHS % isPerturbed
     isEqual = isEqual .and. LHS % type == RHS % type
     isEqual = isEqual .and. LHS % matIdx   == RHS % matIdx
     isEqual = isEqual .and. LHS % cellIdx  == RHS % cellIdx
     isEqual = isEqual .and. LHS % uniqueID == RHS % uniqueID
     isEqual = isEqual .and. LHS % collisionN == RHS % collisionN
     isEqual = isEqual .and. LHS % broodID    == RHS % broodID
+    isEqual = isEqual .and. LHS % k_eff   == RHS % k_eff
 
     if( LHS % isMG ) then
       isEqual = isEqual .and. LHS % G == RHS % G
@@ -911,10 +977,14 @@ contains
 
     self % wgt  = ZERO
     self % r    = ZERO
+    self % f    = ONE
+    self % X    = ZERO
+    self % gpcPert = 0
     self % dir  = ZERO
     self % E    = ZERO
     self % G    = 0
     self % isMG = .false.
+    self % isPerturbed = .false.
     self % type = P_NEUTRON
     self % time = ZERO
     self % matIdx   = -1
@@ -922,6 +992,7 @@ contains
     self % uniqueID = -1
     self % collisionN = 0
     self % broodID    = 0
+    self % k_eff = ZERO
 
   end subroutine kill_particleState
 

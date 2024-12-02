@@ -5,6 +5,8 @@ module particleDungeon_class
   use genericProcedures,     only : numToChar, swap
   use particle_class,        only : particle, particleStateData, particleState
   use RNG_class,             only : RNG
+  use tallyResult_class,     only : tallyResult, histResult, polyResult
+  use polynomial_class,      only : polynomial
   use heapQueue_class,       only : heapQueue
 
   use mpi_func,              only : isMPIMaster, getMPIWorldSize, getMPIRank, getOffset
@@ -100,6 +102,7 @@ module particleDungeon_class
     procedure  :: normSize_Repr
     procedure  :: normSize_notRepr
     procedure  :: combing
+    procedure  :: shuffle
     procedure  :: cleanPop
     procedure  :: setTime
     procedure  :: popSize
@@ -107,6 +110,7 @@ module particleDungeon_class
     procedure  :: setSize
     procedure  :: printToFile
     procedure  :: sortByBroodID
+    procedure  :: importanceCombing
 
     !! Precursor procedures
     procedure  :: precursorCombing
@@ -419,6 +423,22 @@ contains
     self % prisoners % wgt = self % prisoners % wgt * factor
 
   end subroutine normWeight
+
+  subroutine shuffle(self, rand)
+    class(particleDungeon), intent(inout) :: self
+    class(RNG), intent(inout)             :: rand
+    integer(shortInt)                     :: perm, i
+    type(particleState)                   :: temp
+    character(100), parameter :: Here =' shuffle (particleDungeon_class.f90)'
+
+
+    do i = 1, self % pop
+      perm = i + int(floor(rand % get() * (self % pop - i)))
+      temp = self % prisoners(i)
+      self % prisoners(i) = self % prisoners(perm)
+      self % prisoners(perm) = temp
+    end do
+  end subroutine shuffle
 
   !!
   !! Normalise total number of particles in the dungeon to match the provided number
@@ -1110,5 +1130,86 @@ contains
     close(id)
 
   end subroutine printToFile
+
+  !!
+  !! Method to perform unweighted importance combing using the inverse of a polynomial model
+  !! Acts on the uncertain parameter
+  !! Does not preserve weight
+  !!
+  !! Args: 
+  !!   rand   -> random number generator
+  !!   coeffs -> coefficients of the polynomial model to be used for the importance
+  !!   N      -> outgoing weight and particle number
+  !!
+  !! Errors:
+  !!   fatalError if negative importance
+
+  subroutine importanceCombing(self, rand, coeffs, N)
+    class(particleDungeon), intent(inout)     :: self
+    class(RNG), intent(inout)                 :: rand
+    real(defReal), intent(in)                 :: coeffs(:,:)
+    integer(shortInt), intent(in)             :: N
+    integer(shortInt)                         :: i, j, gpcIdx
+    type(particleDungeon), save               :: tmp
+    real(defReal)                             :: combPos, currentParticle
+    real(defReal)                             :: U, W
+    real(defReal), dimension(self % pop)      :: imp, wgt
+    !real(defReal)                             :: x(size(coeffs, dim=1), self % pop)
+    real(defReal)                             :: x(1, self % pop)
+    type(polynomial)                          :: pol(size(coeffs, dim=1))
+    character(100), parameter :: Here = 'importanceCombing (particleDungeon_class.f90)'
+
+    if (.not. allocated(tmp % prisoners)) call tmp % init(size(self % prisoners))
+
+    ! Set polynomial approximation for inverse importance function
+    do i = 1, size(coeffs, dim=1)
+      call pol(i) % build(coeffs(i,:))
+    end do
+
+    ! Shuffle to avoid bias
+    call shuffle(self, rand)
+
+    ! Compute total weight 
+    wgt = self % prisoners(1 : self % pop) % wgt
+    W = sum(wgt)
+    
+    imp = ONE
+    gpcIdx = self % prisoners(1) % gpcPert
+    ! Compute total importance * weight
+    do i = 1, size(pol)
+      x(1, :) = self % prisoners(1 : self % pop) % X(gpcIdx)
+      imp = imp * pol(i) % evaluate(x)
+    end do
+    imp = ONE / imp
+    ! Check that all importance values are positive
+    if (any(imp < ZERO)) call fatalError(Here, "Negative importance: increase particle number or fit order")
+    U = sum(ONE * imp)
+    
+    ! Initial offset to avoid bias
+    combPos = rand % get() * U / N
+    ! Initialize particle cursor
+    currentParticle = ZERO
+
+    ! Apply unweighted importance combing 
+    ! Have to check is setting weight to ONE is alright
+    j = 1
+    do i = 1, self % pop
+      currentParticle = currentParticle + imp(i)
+      do while (combPos < currentParticle)
+        tmp % prisoners(j) = self % prisoners(i)
+        tmp % prisoners(j) % wgt = ONE
+        combPos = combPos + U / N
+        j = j + 1
+      end do
+    end do
+
+    ! Update particleDungeon
+    do i = 1, j - 1
+      self % prisoners(i) = tmp % prisoners(i)
+    end do
+    ! Update population
+    self % pop = j - 1
+  end subroutine
+
 
 end module particleDungeon_class

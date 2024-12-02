@@ -18,12 +18,78 @@ module linearAlgebra_func
   public :: eig
   public :: solve
   public :: solveAdjointProblem
+  public :: solveLeastSquare
   public :: kill_linearAlgebra
 
 
 !!<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 !! External LAPACK Procedures interfaces
 !!<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+ 
+  !!
+  !! lapack_gels
+  !! LAPACK General Matrix Least Square Solver (GE- General Matrix; EV - Least Square)
+  !! For full documentation of these procedures refer to:
+  !! http://www.netlib.org/lapack/explore-html/index.html
+  !! (Just search the webpage for dgels or sgels and you will find a very clear doc)
+  !!
+  !! Interface:
+  !! trans [in]   -> linear system involves A (trans='N') or A**T (trans='T')
+  !! M     [in]   -> rows of the matrix A. M >=0
+  !! N     [in]   -> columns of the matrix A. N >= 0
+  !! NRHS  [in]   -> number of columns of rhs, i.e. B and X. NRHS >= 0
+  !! A     [inout]-> LDA x N Matrix. Will be changed in the algorithm!
+  !! LDA   [in]   -> Leading size of A. LDA >= max(1,M). Must be M
+  !! B     [inout]-> if INFO=0 overwritten with solution column vectors 
+  !! LDB   [in]   -> Leading dimension of B, Must be M
+  !! WORK  [out]  -> Work space. If LWORK = -1. On exit WORK(1) is size of optimal workspace
+  !! LWORK [in]   -> Size of workspace. LWORK >= min(M,N) + max (min(M,N), NRHS)*NB 
+  !!                 If LWORK = -1 optimal size query.
+  !! INFO  [out]  -> Error flag. INFO = 0 for succesfull execution
+  !!
+  !! Note that the only difference in the dgels and sgels is kind of the real arguments. Rest of
+  !! the definition is identical.
+
+  interface lapack_gels
+    
+    !!
+    !! Double precision. 64-bit float
+    !!
+
+    subroutine dgels(TRANS, M, N, NRHS, A, LDA, B, LDB, WORK, LWORK, INFO)
+      use iso_fortran_env, only : real64, int32
+      implicit none
+      character(1), intent(in)                            :: TRANS
+      integer(int32), intent(in)                          :: M
+      integer(int32), intent(in)                          :: N
+      integer(int32), intent(in)                          :: NRHS
+      integer(int32), intent(in)                          :: LDA
+      integer(int32), intent(in)                          :: LDB
+      real(real64), dimension(LDA, N), intent(inout)      :: A
+      real(real64), dimension(LDB, NRHS), intent(inout)   :: B
+      integer(int32), intent(in)                          :: LWORK
+      real(real64), dimension(max(1,LWORK)), intent(out)  :: WORK
+      integer(int32), intent(out)                         :: INFO
+    end subroutine dgels
+
+    subroutine sgels(TRANS, M, N, NRHS, A, LDA, B, LDB, WORK, LWORK, INFO)
+      use iso_fortran_env, only : real32, int32
+      implicit none
+      character(1), intent(in)                            :: TRANS
+      integer(int32), intent(in)                          :: M
+      integer(int32), intent(in)                          :: N
+      integer(int32), intent(in)                          :: NRHS
+      integer(int32), intent(in)                          :: LDA
+      integer(int32), intent(in)                          :: LDB
+      real(real32), dimension(LDA, N), intent(inout)      :: A
+      real(real32), dimension(LDB, NRHS), intent(inout)   :: B
+      integer(int32), intent(in)                          :: LWORK
+      real(real32), dimension(max(1,LWORK)), intent(out)  :: WORK
+      integer(int32), intent(out)                         :: INFO
+    end subroutine sgels
+  
+  end interface lapack_gels
+  
 
   !!
   !! lapack_geev
@@ -448,6 +514,88 @@ contains
     x = B_t(:,1)
 
   end subroutine solve
+
+    !!
+  !! Solves linear system of equations of the form Ax=b
+  !!
+  !! A - any NxN square real matrix
+  !! b - real vector of RHS of size N
+  !! x - resul vector of size N
+  !!
+  !! Gives fatalError if input is invalid or solution A is singular
+  !!
+  subroutine solveLeastSquare(A, x, b)
+    real(defReal), dimension(:,:), intent(in) :: A
+    real(defReal), dimension(:), intent(out)  :: x
+    real(defReal), dimension(:), intent(in)   :: b
+    real(defReal), dimension(:,:), pointer    :: A_t, B_t
+    real(defReal), dimension(:), pointer      :: work
+    integer(shortInt)                         :: M, N, mem, info, start, lwork
+    character(100),parameter :: Here='solveLeastSquare ( linearAlgebra_func.f90)'
+
+    ! Verify size of the inputs
+    M = size(A,1)
+    N = size(A,2)
+    if(size(b) /= M) then
+      call fatalError(Here,'Invalid size of RHS vector b. It is not size M')
+
+    else if(size(x) /= M) then
+      call fatalError(Here,'Invallid size of result vector x. It is not size M')
+
+    end if
+
+    lwork = max(1, min(M, N) + max(min(M,N), 1))
+    mem = M*N + M + lwork
+    call getMem(mem)
+    ! Associate workspace memory with different variables
+    start = 1
+    ! Use pointers to change ranks
+    A_t(1:M,1:N) => workspace(start : start + M*N)
+
+    start = start + M*N + 1
+    B_t(1:M,1:1) => workspace(start : start + M)
+
+    start = start + M + 1
+    
+    work(1:lwork) => workspace(start : start + lwork)
+
+    ! Calculate memory required and ensure that memory is avalible
+    ! Calculate optimal work size
+    call lapack_gels('N', M, N, 1, A_t, M, B_t, M, work, -1, info)
+    lwork = int(work(1))
+
+    mem = M*N + M + lwork
+    call getMem(mem)
+
+    ! Associate workspace memory with different variables
+    start = 1
+    ! Use pointers to change ranks
+    A_t(1:M,1:N) => workspace(start : start + M*N)
+
+    start = start + M*N + 1
+    B_t(1:M,1:1) => workspace(start : start + M)
+
+    start = start + M + 1
+    work(1:lwork) => workspace(start : lwork)
+
+
+    ! Copy input
+    A_t      = A
+    B_t(:,1) = b
+    ! Perform calculation
+    call lapack_gels('N', M, N, 1, A_t, M, B_t, M, work, lwork, info)
+
+    if( info < 0) then
+      call fatalError(Here,'LAPACK procedure failed with error: '//numToChar(info))
+
+    else if(info > 0) then
+      call fatalError(Here,'LAPACK procedure failed. Matrix A is singular.')
+    end if
+
+    ! Copy the results out
+    x = B_t(:,1)
+
+  end subroutine solveLeastSquare
 
   !!
   !! Solves a generalised adjoint problem for a GPT response

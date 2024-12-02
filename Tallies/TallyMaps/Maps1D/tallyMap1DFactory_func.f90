@@ -30,6 +30,7 @@ module tallyMap1DFactory_func
   use materialMap_class,  only : materialMap
   use homogMatMap_class,  only : homogMatMap
   use weightMap_class,    only : weightMap
+  use uncertainMap_class,  only : uncertainMap
   use cellMap_class,      only : cellMap
   use testMap_class,      only : testMap
   use collNumMap_class,   only : collNumMap
@@ -57,7 +58,8 @@ module tallyMap1DFactory_func
                                                                                 'radialMap   ',&
                                                                                 'timeMap     ',&
                                                                                 'directionMap',&
-                                                                                'testMap     ']
+                                                                                'testMap     ',&
+                                                                                'uncertainMap']
 
 contains
 
@@ -104,6 +106,9 @@ contains
 
       case('weightMap')
         allocate(weightMap :: new)
+
+      case('uncertainMap')
+        allocate(uncertainMap :: new)
 
       case('cellMap')
         allocate(cellMap :: new)

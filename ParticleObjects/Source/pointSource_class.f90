@@ -102,6 +102,22 @@ contains
     ! Provide geometry info to source
     self % geom => geom
 
+    ! Get parameter for virtual density coefficient generation
+    call dict % get(temp, 'eps')
+    self % eps = temp
+
+    call dict % getOrDefault(type, 'gpcPert', 'none')
+    select case(type)
+      case('isotropic')
+        self % gpcPert = 0
+      case('radial')
+        self % gpcPert = 1
+      case('axial')
+        self % gpcPert = 2
+      case default
+        self % gpcPert = -1
+    end select
+
     ! Identify which particle is used in the source
     ! Presently limited to neutron and photon
     call dict % getOrDefault(type, 'particle' ,'neutron')
@@ -287,6 +303,8 @@ contains
     self % particleType = P_NEUTRON
     self % isMG         = .false.
     self % isIsotropic  = .false.
+    self % eps    = ZERO
+
 
   end subroutine kill
 

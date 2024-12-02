@@ -1,0 +1,371 @@
+type eigenPhysicsPackage;
+
+pop      20000;
+active   700;
+inactive 300;
+XSdata ce;
+dataType ce;
+!seed   10;
+
+// Specify output format default asciiMATLAB
+//outputFormat asciiJSON;
+
+collisionOperator { neutronCE {type neutronCEstd;}
+                    neutronMG {type neutronMGstd;} }
+
+transportOperator { type transportOperatorDT;
+                    cache 0;
+                    vir_den_swch 1;
+                    deform_type swelling;
+					          direction_type anisotropic;
+					          scale non_uniform;
+                    x_factor   1.0;
+                    y_factor   1.0;
+                    z_factor   1.1;
+					          pert_mat_1 sodium_pert;
+					          pert_mat_2 wrapper_pert;
+					          pert_mat_3 clad_pert;
+					          pert_mat_4 fuel_pert;
+					          pert_mat_5 gap_pert;
+                   // type transportOperatorDT;
+                   // type transportOperatorHT;
+                   }
+
+inactiveTally {}
+
+activeTally {
+  norm totalPow;
+  normVal 1000.0;
+  totalPow  { type collisionClerk; response (fission); fission { type macroResponse; MT -6;}}
+  ResMap {type collisionClerk;
+         map {type multiMap;
+              maps (ene mat);
+              ene { type energyMap; grid log; min 1.0E-11; max 20.0; N 300;}
+              mat { type materialMap; materials (fuel);}
+              }
+         response (flux);
+         flux { type fluxResponse;}
+         }
+}
+
+geometry {
+  type geometryStd; boundary ( 0 0 0 0 0 0); graph {type shrunk;}
+!
+surfaces {                                                                                       // Mikolaj - Are there any constraints on surface names?
+    WRAPPER_IN  { id 1001; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (8.0  8.0  0.0);}
+    WRAPPER_OUT { id 1002; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (8.5  8.5  0.0);}
+    INTER_WRAP  { id 1003; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (9.6  9.6  0.0);}
+    CORE_IN     { id 1004; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (50.0 50.0 0.0);}
+
+    WRAPPER_IN_PERT  { id 1009; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (8.0  8.0  0.0);}
+    WRAPPER_OUT_PERT { id 1010; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (8.5  8.5  0.0);}
+    INTER_WRAP_PERT  { id 1011; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (9.6  9.6  0.0);}
+
+	
+
+  }
+
+  cells {
+     FSA_WRAPPER {id 2001; type simpleCell; surfaces (1001 -1002); filltype mat; material wrapper;} 
+     INT_WRAP_NA {id 2002; type simpleCell; surfaces (1002 -1003); filltype mat; material sodium; }
+     PINLAT_CELL {id 2003; type simpleCell; surfaces (-1001); filltype uni; universe 31;}     // 31 refers to subassembly pin lattice; This cell 2003 is used to develop cell Universe 11!
+
+     ! Pertubed cell definitions
+     FSA_WRAPPER_PERT {id 2006; type simpleCell; surfaces (1009 -1010); filltype mat; material wrapper_pert;}         
+     INT_WRAP_NA_PERT {id 2007; type simpleCell; surfaces (1010 -1011); filltype mat; material sodium;}
+     PINLAT_CELL_PERT {id 2008; type simpleCell; surfaces (-1009); filltype uni; universe 32;}
+
+     ! Pertubed cell definitions end
+  }
+
+  universes {
+    root { id 1; type rootUniverse; border 1004; fill u<21>;}                                        // 201 refers to pin universe. Let 201 be nested in 101 (FSA universe)
+    FSA_UNIV       { id 11; type cellUniverse; cells (2001 2002 2003); origin (0.0 0.0 0.0); rotation (0.0 0.0 0.0); }      // Using 2001-2003, this universe represents a complete fuel subassembly! It is used in Lattice universe 21!  
+    FSA_PERT_UNIV  { id 12; type cellUniverse; cells (2006 2007 2008); origin (0.0 0.0 0.0); rotation (0.0 0.0 0.0); }      // Using 2004-2007, this universe represents a complete PERTURBED fuel subassembly! It is used in Lattice universe 21  at the centre of the core!   
+    // Pin universes
+    fupin { id 50; type pinUniverse; radii (0.09   0.2775    0.285   0.33   0.0);
+                                     fills (gap    fuel      gap     clad   sodium);}  //  fuel pin universe 50 is used to develop fuel pin lattice inside FSA in universe 31.
+    fupin_pert { id 51; type pinUniverse; radii (0.09   0.2775     0.285     0.33       0.0);
+                                     fills (gap_pert    fuel_pert  gap_pert  clad_pert  sodium_pert);}  //  fuel pin universe 51 is used to develop fuel pin lattice inside FSA in universe 31.
+	// Lattices
+    latFuelpin {
+      id 31;                                                                     // Fuelpin universe ID 31 is used to develop cell 2003 PINLAT_CELL
+      type latUniverse;
+      origin (0.0 0.0 0.0);
+      pitch  (0.8 0.8 0.0);
+      shape (18 18 0);
+      padMat sodium;
+      map (
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50
+        50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50); }
+!   Perturbed fuel pin lattice to be used in FSA Universe 12!
+    latFuelpin_pert {
+      id 32;                                                                     // Fuelpin universe ID 32 is used to develop cell 2007 PINLAT_CELL_PERT
+      type latUniverse;
+      origin (0.0 0.0 0.0);
+      pitch  (0.8 0.8 0.0);
+      shape (18 18 0);
+      padMat sodium_pert;
+      map (
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51
+        51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51 51); }
+
+
+    latFSA {
+      id 21;                               // This universe finally represents the complete SFR core in square lattice! It is used to fill up the root universe! 
+      type latUniverse;
+      origin (0.0 0.0 0.0);
+      pitch  (18.0 18.0 0.0);
+      shape (5 5 0);
+      padMat sodium;
+      map (
+        11 11 11 11 11
+        11 11 11 11 11
+        11 11 12 11 11
+        11 11 11 11 11
+        11 11 11 11 11 ); }
+
+  }
+
+}
+viz {
+  myVTK {
+    type vtk;
+    corner (-10.71 -10.71 -0.5);
+    width (21.42 21.42 1.0);
+    vox (700 700 1);
+  }
+  bmp {
+    type bmp;
+    output img;
+    what material;
+    centre (0.0 0.0 0.0);
+    // width (25.0 25.0);
+    axis z;
+    res (5000 5000);
+  }  
+}
+
+
+nuclearData {
+  handles {
+    ce { type aceNeutronDatabase; aceLibrary /home/ad2221/SCONE_SIMULATIONS/SCONE/Build/lib.xsfile;}
+  }
+  materials {
+// Materials for SFR are defined as follows: sodium wrapper clad fuel gap    
+    sodium {
+      temp 273;
+      composition {
+      11023.09	           2.14078E-02;}
+            }
+
+    wrapper {
+       temp 273;
+       composition {
+       26054.09            4.39921E-03;
+       26056.09            6.70866E-02;
+       26057.09            1.58086E-03;
+       26058.09            1.97735E-04;
+       24050.09            3.39525E-04;
+       24052.09            6.30489E-03;
+       24053.09            7.00421E-04;
+       24054.09            1.70958E-04;
+       28058.09            2.70843E-04;
+       28060.09            1.00098E-04;
+       28061.09            4.26257E-06;
+       28062.09            1.33242E-05;
+       28064.09            3.27178E-06;
+       42092.09            7.38750E-05;
+       42094.09            4.51832E-05;
+       42095.09            7.70138E-05;
+       42096.09            7.99504E-05;
+       42097.09            4.53494E-05;
+       42098.09            1.13578E-04;
+       42100.09            4.44931E-05;
+       25055.09            4.18371E-04;
+       6012.09             3.83075E-04;
+       22046.09            1.65058E-06;
+       22047.09            1.45687E-06;
+       22048.09            1.41355E-05;
+       22049.09            1.01615E-06;
+       22050.09            9.53529E-07;
+       14028.09            4.54589E-04;
+       14029.09            2.22971E-05;
+       14030.09            1.42136E-05;}
+             }
+    clad {
+       temp 273;
+       composition {
+       26054.09            3.235020E-03;
+       26056.09            4.933310E-02;
+       26057.09            1.162510E-03;
+       26058.09            1.454080E-04;
+       24050.09            8.020290E-04;
+       24052.09            1.489350E-02;
+       24053.09            1.654540E-03;
+       24054.09            4.038380E-04;
+       13027.09            9.148800E-03;
+       8016.09             3.990360E-04;
+       39089.09            2.662210E-04;
+       22046.09            4.624410E-05;
+       22047.09            4.081680E-05;
+       22048.09            3.960310E-04;
+       22049.09            2.846930E-05;
+       22050.09            2.671490E-05;
+       28058.09            2.529390E-04;
+       28060.09            9.348100E-05;
+       28061.09            3.980800E-06;
+       28062.09            1.244340E-05;
+       28064.09            3.055500E-06;
+       25055.09            2.344290E-04;
+       27059.09            2.185370E-04;
+       29063.09            7.076060E-05;
+       29065.09            3.059700E-05;
+       6012.09             3.577520E-04;
+       15031.09            2.772030E-05;}
+          }
+
+    fuel {
+       temp 273;
+       composition {
+       8016.15     4.503180E-02;
+       92235.15    4.728630E-05;
+       92238.15    1.282915E-02;
+       94238.15    1.463060E-04;
+       94239.15    7.733000E-03;
+       94240.15    1.205000E-03;
+       94241.15    3.330220E-04;
+       94242.15    4.180700E-04;
+       95241.15    3.151800E-05;}
+         }
+    gap {
+       temp 273;
+       composition {
+       2004.09      6.0221E-06;}
+        }
+
+! Here we supply the perturbed material definitions 
+    sodium_pert {
+      temp 273;
+      composition {
+      11023.09	           2.14078E-02;}
+            }
+
+    wrapper_pert {
+       temp 273;
+       composition {
+       26054.09            4.39921E-03;
+       26056.09            6.70866E-02;
+       26057.09            1.58086E-03;
+       26058.09            1.97735E-04;
+       24050.09            3.39525E-04;
+       24052.09            6.30489E-03;
+       24053.09            7.00421E-04;
+       24054.09            1.70958E-04;
+       28058.09            2.70843E-04;
+       28060.09            1.00098E-04;
+       28061.09            4.26257E-06;
+       28062.09            1.33242E-05;
+       28064.09            3.27178E-06;
+       42092.09            7.38750E-05;
+       42094.09            4.51832E-05;
+       42095.09            7.70138E-05;
+       42096.09            7.99504E-05;
+       42097.09            4.53494E-05;
+       42098.09            1.13578E-04;
+       42100.09            4.44931E-05;
+       25055.09            4.18371E-04;
+       6012.09             3.83075E-04;
+       22046.09            1.65058E-06;
+       22047.09            1.45687E-06;
+       22048.09            1.41355E-05;
+       22049.09            1.01615E-06;
+       22050.09            9.53529E-07;
+       14028.09            4.54589E-04;
+       14029.09            2.22971E-05;
+       14030.09            1.42136E-05;}
+             }
+    clad_pert {
+       temp 273;
+       composition {
+       26054.09            3.235020E-03;
+       26056.09            4.933310E-02;
+       26057.09            1.162510E-03;
+       26058.09            1.454080E-04;
+       24050.09            8.020290E-04;
+       24052.09            1.489350E-02;
+       24053.09            1.654540E-03;
+       24054.09            4.038380E-04;
+       13027.09            9.148800E-03;
+       8016.09             3.990360E-04;
+       39089.09            2.662210E-04;
+       22046.09            4.624410E-05;
+       22047.09            4.081680E-05;
+       22048.09            3.960310E-04;
+       22049.09            2.846930E-05;
+       22050.09            2.671490E-05;
+       28058.09            2.529390E-04;
+       28060.09            9.348100E-05;
+       28061.09            3.980800E-06;
+       28062.09            1.244340E-05;
+       28064.09            3.055500E-06;
+       25055.09            2.344290E-04;
+       27059.09            2.185370E-04;
+       29063.09            7.076060E-05;
+       29065.09            3.059700E-05;
+       6012.09             3.577520E-04;
+       15031.09            2.772030E-05;}
+          }
+
+    fuel_pert {
+       temp 273;
+       composition {
+       8016.15     4.503180E-02;
+       92235.15    4.728630E-05;
+       92238.15    1.282915E-02;
+       94238.15    1.463060E-04;
+       94239.15    7.733000E-03;
+       94240.15    1.205000E-03;
+       94241.15    3.330220E-04;
+       94242.15    4.180700E-04;
+       95241.15    3.151800E-05;}
+         }
+    gap_pert {
+       temp 273;
+       composition {
+       2004.09      6.0221E-06;}
+        }
+        }
+}

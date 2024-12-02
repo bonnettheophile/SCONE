@@ -15,6 +15,11 @@ add_sources(./tallyClerk_inter.f90
             ./eventClerk_class.f90
             ./centreOfMassClerk_class.f90
             ./mgXsClerk_class.f90
+            ./coeffOfChaosClerk_class.f90
+            ./implicitChaosClerk_class.f90
+            ./keffXClerk_class.f90
+            ./fissionSourceClerk_class.f90
+            ./uncertainProbClerk_class.f90
              )
 
 add_unit_tests(./Tests/collisionClerk_test.f90

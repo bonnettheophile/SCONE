@@ -11,7 +11,7 @@ module tallyAdmin_class
   use particleDungeon_class,  only : particleDungeon
   use tallyClerk_inter,       only : tallyClerk
   use tallyClerkSlot_class,   only : tallyClerkSlot
-  use tallyResult_class,      only : tallyResult, tallyResultEmpty
+  use tallyResult_class,      only : tallyResult, tallyResultEmpty, histResult
   use scoreMemory_class,      only : scoreMemory
   use outputFile_class,       only : outputFile
 
@@ -197,9 +197,7 @@ contains
     do i = 1, size(names)
       call self % tallyClerks(i) % init(dict % getDictPtr(names(i)), names(i))
       call self % clerksNameMap % add(names(i),i)
-
     end do
-
     ! Register all clerks to receive their reports
     do i = 1, size(self % tallyClerks)
       associate(reports => self % tallyClerks(i) % validReports())
