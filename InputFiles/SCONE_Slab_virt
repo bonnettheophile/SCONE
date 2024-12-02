@@ -1,0 +1,111 @@
+type eigenPhysicsPackage;
+
+pop      20000;
+active   700;
+inactive 300;
+XSdata ce;
+dataType ce;
+
+collisionOperator { neutronCE {type neutronCEstd;}
+                    neutronMG {type neutronMGstd;} }
+
+transportOperator { type transportOperatorDT;
+  cache 0;
+  vir_den_swch 1;
+  deform_type expansion;
+  direction_type isotropic;
+  scale uniform;
+  factor   1.1;}
+
+inactiveTally {
+              }
+
+activeTally  {
+                norm    fiss;
+                normVal 100;
+                fiss { type collisionClerk; response (fiss); fiss {type macroResponse; MT -6;}}
+        }
+        
+geometry {
+    type geometryStd; boundary (0 0 0 0 0 0); graph {type shrunk;}
+
+    surfaces
+    {
+      CORE_OUT     { id 1; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (50.0 50.0 0.0);}
+      PERT_SURF    { id 2; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (20.0 20.0 0.0);}
+    }
+
+
+    cells
+    {
+      HELL {id 2001; type simpleCell; surfaces (2 -1); filltype mat; material fuel;}
+      HEAVEN {id 2002; type simpleCell; surfaces (-2); filltype mat; material fuel_pert;}  
+    }
+
+    universes
+    {
+      root
+      {
+          id 1;
+          type rootUniverse;
+          border 1;
+          fill u<10>;
+      }
+
+      WORLD  { id 10; type cellUniverse; cells (2001 2002); origin (0.0 0.0 0.0); rotation (0.0 0.0 0.0); }
+    }
+}
+
+nuclearData {
+  handles {
+    ce { type aceNeutronDatabase; aceLibrary /home/tbonnet/nuclear_data/full_lib.xsfile;}
+  }
+  materials {
+
+    fuel {
+       temp 273;
+       composition {
+        8016.03     4.503180E-02;
+        92235.03     3.728630E-06;
+        92238.03     1.282915E-02;
+        94238.03     1.463060E-04;
+        94239.03     7.233000E-04;
+        94240.03     1.205000E-03;
+        94241.03     3.330220E-04;
+        94242.03     4.180700E-04;
+        95241.03     3.151800E-05;}
+         }
+
+    fuel_pert {
+       temp 273;
+       composition {
+        8016.03     4.503180E-02;
+        92235.03     3.728630E-06;
+        92238.03     1.282915E-02;
+        94238.03     1.463060E-04;
+        94239.03     7.233000E-04;
+        94240.03     1.205000E-03;
+        94241.03     3.330220E-04;
+        94242.03     4.180700E-04;
+        95241.03     3.151800E-05;}
+         }         
+
+}
+
+}
+
+viz {
+
+  bmp {
+    type bmp;
+    output img;
+    what material;
+    centre (0.0 0.0 0.0);
+    // width (25.0 25.0);
+    axis z;
+    res (1000 1000);
+  }  
+}
+
+
+
