@@ -54,6 +54,8 @@ module particle_class
     real(defReal)              :: E    = ZERO       ! Energy
     integer(shortInt)          :: G    = 0          ! Energy group
     logical(defBool)           :: isMG = .false.    ! Is neutron multi-group
+    logical(defBool)           :: isPerturbed = .false., lastPerturbed = .false. !
+    integer(shortInt)          :: startPerturbed = 0
     integer(shortInt)          :: type = P_NEUTRON  ! Particle physical type
     real(defReal)              :: time = ZERO       ! Particle time position
     integer(shortInt)          :: matIdx   = -1     ! Material index where particle is
@@ -101,6 +103,8 @@ module particle_class
     real(defReal)              :: w0             ! Particle initial weight (for implicit, variance reduction...)
     logical(defBool)           :: isDead
     logical(defBool)           :: isMG
+    logical(defBool)           :: isPerturbed, lastPerturbed
+    integer(shortInt)          :: startPerturbed
     real(defReal)              :: timeMax = ZERO ! Maximum neutron time before cut-off
     integer(shortInt)          :: fate = 0       ! Neutron's fate after being subjected to an operator
     integer(shortInt)          :: type           ! Particle type
@@ -197,6 +201,9 @@ contains
 
     self % isDead = .false.
     self % isMG   = .false.
+    self % isPerturbed = .false.
+    self % startPerturbed = 0
+    self % lastPerturbed = .false.
 
     if(present(t)) then
       self % time = t
@@ -239,6 +246,9 @@ contains
 
     self % isDead = .false.
     self % isMG   = .true.
+    self % isPerturbed = .false.
+    self % startPerturbed = 0
+    self % lastPerturbed = .false.
 
     if(present(t)) then
       self % time = t
@@ -269,6 +279,9 @@ contains
     LHS % E                     = RHS % E
     LHS % G                     = RHS % G
     LHS % isMG                  = RHS % isMG
+    LHS % isPerturbed           = RHS % isPerturbed
+    LHS % startPerturbed        = RHS % startPerturbed
+    LHS % lastPerturbed        = RHS % lastPerturbed
     LHS % type                  = RHS % type
     LHS % time                  = RHS % time
     LHS % collisionN            = RHS % collisionN
@@ -651,6 +664,9 @@ contains
     LHS % E    = RHS % E
     LHS % G    = RHS % G
     LHS % isMG = RHS % isMG
+    LHS % isPerturbed = RHS % isPerturbed
+    LHS % startPerturbed = RHS % startPerturbed
+    LHS % lastPerturbed = RHS % lastPerturbed
     LHS % type = RHS % type
     LHS % time = RHS % time
 
@@ -678,6 +694,9 @@ contains
     isEqual = isEqual .and. all(LHS % dir == RHS % dir)
     isEqual = isEqual .and. LHS % time == RHS % time
     isEqual = isEqual .and. LHS % isMG .eqv. RHS % isMG
+    isEqual = isEqual .and. LHS % isPerturbed .eqv. RHS % isPerturbed
+    isEqual = isEqual .and. LHS % startPerturbed == RHS % startPerturbed
+    isEqual = isEqual .and. LHS % lastPerturbed .eqv. RHS % lastPerturbed
     isEqual = isEqual .and. LHS % type == RHS % type
     isEqual = isEqual .and. LHS % matIdx   == RHS % matIdx
     isEqual = isEqual .and. LHS % cellIdx  == RHS % cellIdx
@@ -720,6 +739,9 @@ contains
     self % E    = ZERO
     self % G    = 0
     self % isMG = .false.
+    self % isPerturbed = .false.
+    self % startPerturbed = 0
+    self % lastPerturbed = .false.
     self % type = P_NEUTRON
     self % time = ZERO
     self % matIdx   = -1

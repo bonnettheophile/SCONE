@@ -249,6 +249,7 @@ contains
         pTemp % E   = E_out
         pTemp % wgt = wgt
         pTemp % collisionN = 0
+        pTemp % startPerturbed = 0
 
         call nextCycle % detain(pTemp)
 
