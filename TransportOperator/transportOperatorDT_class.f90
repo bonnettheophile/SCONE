@@ -68,7 +68,7 @@ contains
     real(defReal)                             :: enquiry_XS_test
     real(defReal)                             :: enquiry_XS_max
     integer(shortInt)                         :: mat_Idx_unpert = 0, mat_Idx_pert = 0
-    logical(defBool)                         :: weight_pert, denizen_pert, pert_region
+    logical(defBool)                          :: weight_pert, denizen_pert, pert_region
 
 !   Data definitions for virtual density end here!
 
@@ -76,31 +76,6 @@ contains
     majorant_inv = ONE / self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS)
 
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
-
-    if (self % virtual_density) then   ! Preliminary check to see if majorant needs to be checked against virtual cross-sections!
-        denizen_pert = .false.         ! Initialization of particle as unperturbed
-        weight_pert = .false.     ! Initialization of weight as unperturbed
-        pert_region = .false.     ! Initialization of perturbed region condition as unperturbed
-
-          if (((self % deform_type == 'swelling') .and. (self % product_factor < ONE )) .or. &
-             (((self % deform_type == 'expansion') .and. (self % product_factor > ONE )))) then
-            enquiry_XS_test = self % xsData % getTotalMatXS(p, mm_matIdx(test_name))
-            !enquiry_XS_max=maxval(enquiry_XS_test)
-            enquiry_XS_max = enquiry_XS_test ! because not an array in this case
-
-              if (self % deform_type == 'swelling') then
-               virtual_XS(1) = enquiry_XS_max / (self % vector_factor(2) * self % vector_factor(3))
-               virtual_XS(2) = enquiry_XS_max / (self % vector_factor(1) * self % vector_factor(3))
-               virtual_XS(3) = enquiry_XS_max / (self % vector_factor(1) * self % vector_factor(2))
-              elseif (self % deform_type == 'expansion') then
-               virtual_XS = enquiry_XS_max * self % vector_factor
-              end if
-              virtual_XS_max_inv= ONE / maxval(virtual_XS)      ! Inverse of the maximum virtual cross-section!
-              if (virtual_XS_max_inv < majorant_inv) then    ! Condition to check if the majorant will be exceeded in virtual perturbation!!
-                 majorant_inv = virtual_XS_max_inv
-              end if
-          end if
-    end if
 
     DTLoop:do
       distance = -log( p % pRNG % get() ) * majorant_inv
