@@ -64,8 +64,8 @@ contains
 !   Data definitions for virtual density module  !
     real(defReal),dimension(3)                :: cosines,virtual_cosines, real_vector, virtual_vector, virtual_XS
     real(defReal)                             :: virtual_dist, flight_stretch_factor, virtual_XS_max_inv
-    character(nameLen)                        :: test_name = 'clad'
-    real(defReal)                             :: enquiry_XS_test
+    character(nameLen)                        :: test_name = 'fuel', test_name2 = 'clad'
+    real(defReal),dimension(2)                             :: enquiry_XS_test
     real(defReal)                             :: enquiry_XS_max
     integer(shortInt)                         :: mat_Idx_unpert = 0, mat_Idx_pert = 0
     logical(defBool)                          :: weight_pert, denizen_pert, pert_region
@@ -77,104 +77,112 @@ contains
 
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
+    if (self % virtual_density .and. .false.) then   ! Preliminary check to see if majorant needs to be checked against virtual cross-sections!
+
+          if (((self % deform_type == 'swelling') .and. (self % product_factor < ONE )) .or. &
+             (((self % deform_type == 'expansion') .and. (self % product_factor > ONE )))) then
+            enquiry_XS_test(1) = self % xsData % getTrackMatXS(p, mm_matidx(test_name))
+            enquiry_XS_test(2) = self % xsData % getTrackMatXS(p, mm_matidx(test_name2))
+            enquiry_XS_max=maxval(enquiry_XS_test)
+            !enquiry_XS_max = enquiry_XS_test ! because not an array in this case
+
+              if (self % deform_type == 'swelling') then
+               virtual_XS(1) = enquiry_XS_max / (self % vector_factor(2) * self % vector_factor(3))
+               virtual_XS(2) = enquiry_XS_max / (self % vector_factor(1) * self % vector_factor(3))
+               virtual_XS(3) = enquiry_XS_max / (self % vector_factor(1) * self % vector_factor(2))
+              elseif (self % deform_type == 'expansion') then
+               virtual_XS = enquiry_XS_max * self % vector_factor
+              end if
+              virtual_XS_max_inv= ONE / maxval(virtual_XS)      ! Inverse of the maximum virtual cross-section!
+              if (virtual_XS_max_inv < majorant_inv) then    ! Condition to check if the majorant will be exceeded in virtual perturbation!!
+                 majorant_inv = virtual_XS_max_inv
+              end if
+          end if
+    end if
+
     DTLoop:do
       distance = -log( p % pRNG % get() ) * majorant_inv
-       if (self % virtual_density) then
-          if (trim(self % scale_type) == 'non_uniform') then
-               if (any(self % pert_Mat_id == p % matIdx())) then
-                self % vector_factor = self % vector_factor_cur
-                self % deform_type = 'swelling'
-               else
-                 self % vector_factor = ONE
-               end if
-           end if
-
-          if (((trim(self % scale_type) == 'non_uniform') .and. (any(self % pert_Mat_id == p % matIdx()))) &
-              .or. (trim(self % scale_type) == 'uniform')) then    
-                cosines(:) = p % dirGlobal()
-                real_vector = distance * cosines
-
-               if (self % deform_type == 'swelling') then
-                  virtual_vector(1) = real_vector(1) * self % vector_factor(2) * self % vector_factor(3)
-                  virtual_vector(2) = real_vector(2) * self % vector_factor(1) * self % vector_factor(3)
-                  virtual_vector(3) = real_vector(3) * self % vector_factor(1) * self % vector_factor(2)
-                  virtual_dist = sqrt(sum(virtual_vector**2))
-                  flight_stretch_factor = virtual_dist / distance
-                  virtual_cosines(1) = cosines(1) * self % vector_factor(2) * self % vector_factor(3) / flight_stretch_factor
-                  virtual_cosines(2) = cosines(2) * self % vector_factor(1) * self % vector_factor(3) / flight_stretch_factor
-                  virtual_cosines(3) = cosines(3) * self % vector_factor(1) * self % vector_factor(2) / flight_stretch_factor
-               elseif (self % deform_type == 'expansion') then
-                  virtual_vector = real_vector / self % vector_factor
-                  virtual_dist = sqrt(sum(virtual_vector**2))
-                  flight_stretch_factor = virtual_dist/distance
-                  virtual_cosines = cosines / (self % vector_factor*flight_stretch_factor)
-               else
-                  print *,'Error in recognizing type of geometric deformation! Please check input!'
-               end if
-              
-               call p % point(virtual_cosines)
-               distance = virtual_dist
-
-               denizen_pert = .true.    ! Indicates that this neutron has been found inside perturbed region
-           end if
-          if (trim(self % scale_type) == 'non_uniform') then
-            if (any(self % pert_Mat_id == p % matIdx())) then
-               pert_region = .true.         ! indicates neutron is in perturbed region
-               mat_Idx_pert = p % matIdx()
-               mat_Idx_unpert = 0
-             else
-               pert_region = .false.         ! indicates prisoner is in unperturbed region
-               mat_Idx_unpert = p % matIdx()
-               mat_Idx_pert = 0
+      if (self % virtual_density) then
+        if (trim(self % scale_type) == 'non_uniform') then
+          if (any(self % pert_Mat_id == p % matIdx())) then
+            p % isPerturbed = .true. ! Set particle to be perturbed
+            if (p % startPerturbed == 0) then
+              p % startPerturbed = 1 ! Set particle starting in perturbed region
+              p % lastPerturbed = .true.
             end if
-         end if
-       end if
-      ! Move partice in the geometry
+          else
+            p % isPerturbed = .false.
+            if (p % startPerturbed == 0) then 
+              p % startPerturbed = 2 ! Set particle starting in unperturbed region
+              p % lastPerturbed = .false.
+            end if
+          end if
+        end if
+
+        if (((trim(self % scale_type) == 'non_uniform') .and. (any(self % pert_Mat_id == p % matIdx()))) &
+            .or. (trim(self % scale_type) == 'uniform')) then    
+              cosines(:) = p % dirGlobal()
+              real_vector = distance * cosines
+
+              if (self % deform_type == 'swelling') then
+                virtual_vector(1) = real_vector(1) * self % vector_factor(2) * self % vector_factor(3)
+                virtual_vector(2) = real_vector(2) * self % vector_factor(1) * self % vector_factor(3)
+                virtual_vector(3) = real_vector(3) * self % vector_factor(1) * self % vector_factor(2)
+                virtual_dist = sqrt(sum(virtual_vector**2))
+                flight_stretch_factor = virtual_dist / distance
+                virtual_cosines(1) = cosines(1) * self % vector_factor(2) * self % vector_factor(3) / flight_stretch_factor
+                virtual_cosines(2) = cosines(2) * self % vector_factor(1) * self % vector_factor(3) / flight_stretch_factor
+                virtual_cosines(3) = cosines(3) * self % vector_factor(1) * self % vector_factor(2) / flight_stretch_factor
+              elseif (self % deform_type == 'expansion') then
+                virtual_vector = real_vector / self % vector_factor
+                virtual_dist = sqrt(sum(virtual_vector**2))
+                flight_stretch_factor = virtual_dist/distance
+                virtual_cosines = cosines / (self % vector_factor*flight_stretch_factor)
+              else
+                print *,'Error in recognizing type of geometric deformation! Please check input!'
+              end if
+            
+              call p % point(virtual_cosines)
+              distance = virtual_dist
+
+        end if
+      end if
+    ! Move partice in the geometry
 
       call self % geom % teleport(p % coords, distance)
 
+      if (trim(self % scale_type) == 'non_uniform') then
+        if (any(self % pert_Mat_id == p % matIdx())) then
+            p % isPerturbed = .true.
+          else
+            p % isPerturbed = .false.
+        end if
+      end if
+
       if ((self % virtual_density) .and. (trim(self % scale_type) == 'non_uniform')) then
-
-         if ((pert_region) .and. (all(self % pert_Mat_id /= p % matIdx()))) then !&.and. (p % matIdx() /= OUTSIDE_FILL)) then
-              pert_region = .false.
-
-              if ((abs(p % w - ONE) < 1e-5) .or. (abs(p % w - TWO) < 1e-5)) then ! prisoner is crossing over from its original perturbed cell to an unperturbed region
-                self % cross_over = .true.         ! marks the prisoner to have crossed over to a new region
-                p % w = p % w / (1.0 + ((self % vector_factor(3) - ONE) / ONE))   ! Weight is perturbed on cross-over to a new region  
-              elseif ((abs(p % w - (ONE / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5) &
-               .or. (abs(p % w - (TWO / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5)) then ! prisoner has now gone back to his original region!
-                self % cross_over = .true.         ! markes the prisoner to have crossed over to a new region !
-                p % w = p % w * (ONE + ((self % vector_factor(3) - ONE) / ONE))  ! Weight is perturbed on cross-over to a new region
-              end if
-
-          elseif  ((.not. pert_region) .and. (any(self % pert_Mat_id == p % matIdx()))) then
-              pert_region = .true.
-              if ((abs(p % w - ONE) < 1e-5) .or. (abs(p % w - TWO) < 1e-5)) then ! prisoner is crossing over from his original region to a new region !
-                self % cross_over = .true.         ! markes the prisoner to have crossed over to a new region !
-                p % w = p % w / (ONE + ((self % vector_factor(3) - ONE) / ONE))   ! Weight is perturbed on cross-over to a new region
-              elseif ((abs(p % w - (ONE / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5) &
-               .or. (abs(p % w - (TWO / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5)) then ! prisoner has now gone back to his original region!
-                self % cross_over = .false.         ! markes the prisoner is now back in his original region !
-                p % w = p % w * (ONE + ((self % vector_factor(3) - ONE) / ONE))    ! Weight perturbation is removed since the prisoner no longer contributes to the current
-             end if
-                  
+        if (( p % lastPerturbed .eqv. .false.) .and. p % isPerturbed) then
+          if (p % startPerturbed == 1) then
+            !p % w = p % w / self % vector_factor(3)
+            p % w = p % w / self % vector_factor(3)**2 !isotropic swelling
+          else
+            p % w = p % w * self % vector_factor(3)**2 !isotropic swelling
+            !p % w = p % w * self % vector_factor(3)
           end if
-            if ((p % w < 0.88) .and. ((self % vector_factor(3) - ONE) > 1e-5)) then
-                call fatalError(Here, "Warning! Incorrect current perturbation!")
-                print *,'mat_Idx_unpert,mat_Idx_pert, p % matIdx() = ',mat_Idx_unpert, mat_Idx_pert, p % matIdx()
-                print *,'p % w = ',p % w
-                print *,'pert_region_cond, self % cross_over_cond = ', pert_region, self % cross_over
-            end if                
-       end if
+        elseif (( p % lastPerturbed) .and. (p % isPerturbed .eqv. .false.)) then
+          if (p % startPerturbed == 1) then
+            p % w = p % w * self % vector_factor(3)**2 !isotropic swelling
+            !p % w = p % w / self % vector_factor(3)
+          else
+            p % w = p % w / self % vector_factor(3)**2 !isotropic swelling
+            !p % w = p % w * self % vector_factor(3)
+          end if
+        end if
+        p % lastPerturbed = p % isPerturbed
+      end if              
 
       ! If particle has leaked exit
       if (p % matIdx() == OUTSIDE_FILL) then
         p % fate = LEAK_FATE
-            !if ((abs(p % w - ONE / (ONE + ((self % vector_factor(3) - ONE) / TWO))) < 1e-5) .or. &
-             !(abs(p % w - TWO / (ONE + ((self % vector_factor(3) - ONE) / TWO))) < 1e-5)) then ! prisoner has now gone back to his original region!
-                !p % w = p % w * (ONE + ((self % vector_factor(3) - ONE) / TWO))
-                !print *,'p % w = ',p % w
-            !end if
         p % isDead = .true.
         return
       end if
@@ -192,6 +200,7 @@ contains
       end if
 
       ! Obtain the local cross-section
+      
       sigmaT = self % xsData % getTrackMatXS(p, p % matIdx())
 
       ! Roll RNG to determine if the collision is real or virtual
