@@ -36,12 +36,13 @@ module transportOperatorDT_class
   !!
   type, public, extends(transportOperator) :: transportOperatorDT
 !   Data definitions for virtual density module  !
-    real(defReal)                  :: product_factor 
-    real(defReal), dimension(3)    :: vector_factor, vector_factor_cur
-    logical(defBool)               :: virtual_density, cross_over = .false.
-    character(nameLen)             :: deform_type, direction_type, scale_type
-    character(nameLen)             :: perturb_mat
-    integer(shortInt),dimension(6) :: pert_Mat_Id = 0
+    real(defReal)                    :: product_factor 
+    real(defReal), dimension(3)      :: vector_factor, vector_factor_cur
+    logical(defBool)                 :: virtual_density, cross_over = .false.
+    character(nameLen)               :: deform_type, direction_type, scale_type
+    character(nameLen), allocatable  :: pert_mat(:)
+    integer(shortInt), allocatable   :: pert_mat_id(:)
+    integer(shortInt)                :: nb_pert_mat
 !   Data definitions for virtual density module  !
   contains
     procedure :: transit => deltaTracking
@@ -67,7 +68,7 @@ contains
     character(nameLen)                        :: test_name = 'fuel', test_name2 = 'clad'
     real(defReal),dimension(2)                             :: enquiry_XS_test
     real(defReal)                             :: enquiry_XS_max
-    integer(shortInt)                         :: mat_Idx_unpert = 0, mat_Idx_pert = 0
+    integer(shortInt)                         :: mat_Idx_unpert = 0, mat_Idx_pert = 0, index = 1
     logical(defBool)                          :: weight_pert, denizen_pert, pert_region
 
 !   Data definitions for virtual density end here!
@@ -77,34 +78,11 @@ contains
 
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
-    if (self % virtual_density .and. .false.) then   ! Preliminary check to see if majorant needs to be checked against virtual cross-sections!
-
-          if (((self % deform_type == 'swelling') .and. (self % product_factor < ONE )) .or. &
-             (((self % deform_type == 'expansion') .and. (self % product_factor > ONE )))) then
-            enquiry_XS_test(1) = self % xsData % getTrackMatXS(p, mm_matidx(test_name))
-            enquiry_XS_test(2) = self % xsData % getTrackMatXS(p, mm_matidx(test_name2))
-            enquiry_XS_max=maxval(enquiry_XS_test)
-            !enquiry_XS_max = enquiry_XS_test ! because not an array in this case
-
-              if (self % deform_type == 'swelling') then
-               virtual_XS(1) = enquiry_XS_max / (self % vector_factor(2) * self % vector_factor(3))
-               virtual_XS(2) = enquiry_XS_max / (self % vector_factor(1) * self % vector_factor(3))
-               virtual_XS(3) = enquiry_XS_max / (self % vector_factor(1) * self % vector_factor(2))
-              elseif (self % deform_type == 'expansion') then
-               virtual_XS = enquiry_XS_max * self % vector_factor
-              end if
-              virtual_XS_max_inv= ONE / maxval(virtual_XS)      ! Inverse of the maximum virtual cross-section!
-              if (virtual_XS_max_inv < majorant_inv) then    ! Condition to check if the majorant will be exceeded in virtual perturbation!!
-                 majorant_inv = virtual_XS_max_inv
-              end if
-          end if
-    end if
-
     DTLoop:do
       distance = -log( p % pRNG % get() ) * majorant_inv
       if (self % virtual_density) then
         if (trim(self % scale_type) == 'non_uniform') then
-          if (any(self % pert_Mat_id == p % matIdx())) then
+          if (any(self % pert_mat_id == p % matIdx())) then
             p % isPerturbed = .true. ! Set particle to be perturbed
             if (p % startPerturbed == 0) then
               p % startPerturbed = 1 ! Set particle starting in perturbed region
@@ -119,7 +97,7 @@ contains
           end if
         end if
 
-        if (((trim(self % scale_type) == 'non_uniform') .and. (any(self % pert_Mat_id == p % matIdx()))) &
+        if (((trim(self % scale_type) == 'non_uniform') .and. (any(self % pert_mat_id == p % matIdx()))) &
             .or. (trim(self % scale_type) == 'uniform')) then    
               cosines(:) = p % dirGlobal()
               real_vector = distance * cosines
@@ -152,7 +130,7 @@ contains
       call self % geom % teleport(p % coords, distance)
 
       if (trim(self % scale_type) == 'non_uniform') then
-        if (any(self % pert_Mat_id == p % matIdx())) then
+        if (any(self % pert_mat_id == p % matIdx())) then
             p % isPerturbed = .true.
           else
             p % isPerturbed = .false.
@@ -219,6 +197,8 @@ contains
   subroutine init(self, dict)
     class(transportOperatorDT), intent(inout) :: self
     class(dictionary), intent(in)             :: dict
+    character(nameLen)                        :: tmp = 'pert_mat'
+    integer(shortInt)                         :: index
          !Virtual Density Data call  begins !
 
     call init_super(self, dict)
@@ -242,8 +222,14 @@ contains
         self % product_factor = self % vector_factor(1) * self % vector_factor(2) * self % vector_factor(3)
 
         if (trim(self % scale_type) == 'non_uniform') then
-              call dict % getorDefault(self % perturb_mat, 'pert_mat','uniform')
-              self % pert_Mat_Id(1) = mm_matIdx(self % perturb_mat)
+          call dict % getorDefault(self % nb_pert_mat, 'nb_pert_mat', 1)
+          allocate(self % pert_mat(self % nb_pert_mat))
+          allocate(self % pert_mat_id(self % nb_pert_mat))
+          do index = 1, self % nb_pert_mat
+            write(tmp, "(A)") index
+            call dict % getorDefault(self % pert_mat(index), trim(tmp),'uniform')
+            self % pert_mat_id(index) = mm_matIdx(self % pert_mat(index))
+          end do
         end if
       end if
 !    Virtual Density Data call  ends !
