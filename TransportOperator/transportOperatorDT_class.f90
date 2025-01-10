@@ -93,21 +93,21 @@ contains
               .or. (trim(self % scale_type) == 'uniform')) then    
                 cosines(:) = p % dirGlobal()
                 real_vector = distance * cosines
-
+                
                if (self % deform_type == 'swelling') then
-                  virtual_vector(1) = real_vector(1) * self % vector_factor(2) * self % vector_factor(3)
-                  virtual_vector(2) = real_vector(2) * self % vector_factor(1) * self % vector_factor(3)
-                  virtual_vector(3) = real_vector(3) * self % vector_factor(1) * self % vector_factor(2)
+                  virtual_vector(1) = real_vector(1) * p % f(2) * p % f(3)
+                  virtual_vector(2) = real_vector(2) * p % f(1) * p % f(3)
+                  virtual_vector(3) = real_vector(3) * p % f(1) * p % f(2)
                   virtual_dist = sqrt(sum(virtual_vector**2))
                   flight_stretch_factor = virtual_dist / distance
-                  virtual_cosines(1) = cosines(1) * self % vector_factor(2) * self % vector_factor(3) / flight_stretch_factor
-                  virtual_cosines(2) = cosines(2) * self % vector_factor(1) * self % vector_factor(3) / flight_stretch_factor
-                  virtual_cosines(3) = cosines(3) * self % vector_factor(1) * self % vector_factor(2) / flight_stretch_factor
+                  virtual_cosines(1) = cosines(1) * p % f(2) * p % f(3) / flight_stretch_factor
+                  virtual_cosines(2) = cosines(2) * p % f(1) * p % f(3) / flight_stretch_factor
+                  virtual_cosines(3) = cosines(3) * p % f(1) * p % f(2) / flight_stretch_factor
                elseif (self % deform_type == 'expansion') then
-                  virtual_vector = real_vector / self % vector_factor
+                  virtual_vector = real_vector / p % f
                   virtual_dist = sqrt(sum(virtual_vector**2))
                   flight_stretch_factor = virtual_dist/distance
-                  virtual_cosines = cosines / (self % vector_factor*flight_stretch_factor)
+                  virtual_cosines = cosines / (p % f * flight_stretch_factor)
                else
                   print *,'Error in recognizing type of geometric deformation! Please check input!'
                end if
