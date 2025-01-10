@@ -87,6 +87,9 @@ contains
     ! Provide geometry info to source
     self % geom => geom
 
+    ! Get parameter for virtual density coefficient generation
+    call dict % getOrDefault(self % eps, 'eps', ZERO)
+
     ! Select Energy Type
     call dict % getOrDefault(type, 'data', 'ce')
     select case(type)
@@ -201,6 +204,9 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
+      p % X    = 2 * rand % get() - ONE
+      p % f        = ONE + p % X * self % eps
+
 
       ! Set Energy
       select type (nucData)
@@ -273,6 +279,7 @@ contains
     self % top    = ZERO
     self % E      = ZERO
     self % G      = 0
+    self % eps    = ZERO
 
   end subroutine kill
 

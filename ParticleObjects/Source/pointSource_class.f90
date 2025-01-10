@@ -101,6 +101,9 @@ contains
     ! Provide geometry info to source
     self % geom => geom
 
+    ! Get parameter for virtual density coefficient generation
+    call dict % getOrDefault(self % eps, 'eps', ZERO)
+
     ! Identify which particle is used in the source
     ! Presently limited to neutron and photon
     call dict % getOrDefault(type, 'particle' ,'neutron')
@@ -286,6 +289,8 @@ contains
     self % particleType = P_NEUTRON
     self % isMG         = .false.
     self % isIsotropic  = .false.
+    self % eps    = ZERO
+
 
   end subroutine kill
 

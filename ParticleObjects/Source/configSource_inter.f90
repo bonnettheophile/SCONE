@@ -135,6 +135,9 @@ contains
     call self % sampleEnergy(p, rand)
     p % time = ZERO
     p % wgt  = ONE
+    p % X    = 2 * rand % get() - ONE
+    p % f    = ONE + p % X * self % eps
+
 
   end function sampleParticle
 
