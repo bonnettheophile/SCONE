@@ -66,8 +66,8 @@ contains
     val_vec(2) = value
 
     ! Computes up to n-th using Bonnet recurrence formula
-    do i = 3, n
-      val_vec(i) = ((2*i-1)*value*val_vec(i-1)-(i-1)*val_vec(i-2))/i
+    do i = 2, n
+      val_vec(i+1) = ((2*i-1)*value*val_vec(i)-(i-1)*val_vec(i-1))/i
     end do
     
   end function evaluateLegendre_Pn
