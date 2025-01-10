@@ -95,9 +95,9 @@ module universalVariables
   real(defReal), dimension(2,1) :: G1 = reshape([0, 2], shape(G1)) 
   real(defReal), dimension(2,2) :: G2 = reshape([ONE/sqrt(3.0_defReal), ONE, &
                                                 -ONE/sqrt(3.0_defReal), ONE], shape(G2))
-  real(defReal), dimension(2,3) :: G3 = reshape([0., 8./9., &
-                                                 sqrt(3./5.), 5./9., &
-                                                 -sqrt(3./5.), 5./9.], shape(G3))
+  real(defReal), dimension(2,3) :: G3 = reshape([0.0_defReal, 8.0_defReal/9.0_defReal, &
+                                                 sqrt(3.0_defReal/5.0_defReal), 5.0_defReal/9.0_defReal, &
+                                                 -sqrt(3.0_defReal/5.0_defReal), 5.0_defReal/9.0_defReal], shape(G3))
   real(defReal), dimension(2,4) :: G4 = reshape([-sqrt(3./7. - 2./7.*sqrt(6./5.)), (18.+sqrt(30.))/36., &
                                                  sqrt(3./7. - 2./7.*sqrt(6./5.)), (18.+sqrt(30.))/36., &
                                                  -sqrt(3./7. + 2./7.*sqrt(6./5.)), (18.-sqrt(30.))/36., &   

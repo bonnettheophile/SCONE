@@ -199,7 +199,7 @@ contains
     type(neutronMicroXSs)                :: microXSs
     type(particleState)                  :: pTemp
     real(defReal),dimension(3)           :: r, dir
-    integer(shortInt)                    :: n, i
+    integer(shortInt)                    :: n, i, j
     real(defReal)                        :: wgt, w0, rand1, E_out, mu, phi
     real(defReal)                        :: sig_nufiss, sig_tot, k_eff
     character(100),parameter             :: Here = 'implicit (neutronCEstd_class.f90)'
@@ -251,8 +251,15 @@ contains
         pTemp % collisionN = 0
         pTemp % startPerturbed = 0
         pTemp % Xold = p % X
-        pTemp % X = 2*p % pRNG % get() - ONE
-        pTemp % f = ONE + pTemp % X * self % eps
+        if (self % isotropic_pert) then 
+          pTemp % X = 2*p % pRNG % get() - ONE
+          pTemp % f = ONE + pTemp % X * self % eps
+        else
+          do j = 1, 3
+            pTemp % X(j) = 2 * p % pRNG % get() - 1
+            pTemp % f(j) = ONE + pTemp % X(j) * self % eps(j)
+          end do
+        end if
 
         call nextCycle % detain(pTemp)
 

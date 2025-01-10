@@ -54,7 +54,7 @@ contains
   function evaluateLegendre_Pn(n, value) result(val_vec)
     integer(shortInt), intent(in)         :: n
     real(defReal), intent(in)             :: value
-    real(defReal), dimension(max(2,n))    :: val_vec
+    real(defReal), dimension(n+1)    :: val_vec
     integer(shortInt)                     :: i
     character(100), parameter :: Here = 'evaluateLegendre_Pn ( legendrePoly_func.f90)'
 
@@ -62,12 +62,12 @@ contains
     if (abs(value) > 1) call fatalError(Here, 'Legendre polynomials are defined in [-1,1]')
 
     ! Return at least the first two polynomials, as there is no point in having n = 0
-    val_vec(1) = ONE
-    val_vec(2) = value
+    if (n >= 0) val_vec(1) = ONE
+    if (n >= 1) val_vec(2) = value
 
     ! Computes up to n-th using Bonnet recurrence formula
     do i = 2, n
-      val_vec(i+1) = ((2*i-1)*value*val_vec(i)-(i-1)*val_vec(i-1))/i
+      val_vec(i+1) = ((TWO*real(i,defReal)-ONE)*value*val_vec(i)-(real(i,defReal)-ONE)*val_vec(i-1))/real(i,defReal)
     end do
     
   end function evaluateLegendre_Pn

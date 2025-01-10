@@ -60,7 +60,8 @@ module collisionProcessor_inter
   !!
   type, public, abstract :: collisionProcessor
     private
-    real(defReal), public :: eps ! Parameter for sampling virtual density parameters
+    real(defReal), dimension(3), public :: eps ! Parameter for sampling virtual density parameters
+    logical(defBool), public            :: isotropic_pert ! Flag for isotropic/anisotropic virtual density
   contains
     ! Master non-overridable procedures
     procedure, non_overridable :: collide
@@ -191,8 +192,16 @@ contains
     class(collisionProcessor), intent(inout) :: self
     class(dictionary), intent(in)            :: dict
 
-    call dict % getOrDefault(self % eps, 'eps', ZERO)
-
+    call dict % getOrDefault(self % isotropic_pert, 'isotropic', .true.) ! Default to isotropic perturbation
+    if (self % isotropic_pert) then
+      call dict % getOrDefault(self % eps(1), 'eps', ZERO)
+      call dict % getOrDefault(self % eps(2), 'eps', ZERO)
+      call dict % getOrDefault(self % eps(3), 'eps', ZERO)
+    else
+      call dict % getOrDefault(self % eps(1), 'epsX', ZERO)
+      call dict % getOrDefault(self % eps(2), 'epsY', ZERO)
+      call dict % getOrDefault(self % eps(3), 'epsZ', ZERO)
+    end if
   end subroutine init
 
 end module collisionProcessor_inter

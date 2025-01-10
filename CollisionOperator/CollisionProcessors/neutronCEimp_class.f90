@@ -279,7 +279,7 @@ contains
     type(neutronMicroXSs)                :: microXSs
     type(particleState)                  :: pTemp
     real(defReal),dimension(3)           :: r, dir, val
-    integer(shortInt)                    :: n, i
+    integer(shortInt)                    :: n, i, j
     real(defReal)                        :: wgt, rand1, E_out, mu, phi
     real(defReal)                        :: sig_nufiss, sig_tot, k_eff, &
                                             sig_scatter, totalElastic
@@ -339,8 +339,15 @@ contains
         pTemp % wgt = wgt
         pTemp % collisionN = 0
         pTemp % Xold = p % X
-        pTemp % X = 2*p % pRNG % get() - ONE
-        pTemp % f = ONE + pTemp % X * self % eps
+        if (self % isotropic_pert) then 
+          pTemp % X = 2*p % pRNG % get() - ONE
+          pTemp % f = ONE + pTemp % X * self % eps
+        else
+          do j = 1, 3
+            pTemp % X(j) = 2 * p % pRNG % get() - 1
+            pTemp % f(j) = ONE + pTemp % X(j) * self % eps(j)
+          end do
+        end if
 
         call nextCycle % detain(pTemp)
         if (self % uniFissSites) call self % ufsField % storeFS(pTemp)
@@ -403,7 +410,7 @@ contains
     type(fissionCE), pointer             :: fiss
     type(particleState)                  :: pTemp
     real(defReal),dimension(3)           :: r, dir, val
-    integer(shortInt)                    :: n, i
+    integer(shortInt)                    :: n, i, j
     real(defReal)                        :: wgt, rand1, E_out, mu, phi
     real(defReal)                        :: sig_nufiss, sig_fiss, k_eff
     character(100),parameter             :: Here = 'fission (neutronCEimp_class.f90)'
@@ -459,8 +466,15 @@ contains
         pTemp % wgt = wgt
         pTemp % collisionN = 0
         pTemp % Xold = p % X
-        pTemp % X = 2*p % pRNG % get() - ONE
-        pTemp % f = ONE + pTemp % X * self % eps
+        if (self % isotropic_pert) then 
+          pTemp % X = 2*p % pRNG % get() - ONE
+          pTemp % f = ONE + pTemp % X * self % eps
+        else
+          do j = 1, 3
+            pTemp % X(j) = 2 * p % pRNG % get() - 1
+            pTemp % f(j) = ONE + pTemp % X(j) * self % eps(j)
+          end do
+        end if
 
 
         call nextCycle % detain(pTemp)
