@@ -181,7 +181,7 @@ contains
         legendrePol = evaluateLegendre(self % P, p % Xold(1)) 
         !legendrePol = evaluateLegendre(self % P, ZERO)
         do j = 1, self % P + 1
-          tmp_score(j) = tmp_score(j) + (2*(j-1) + 1) * legendrePol(j) * p % w
+          tmp_score(j) = tmp_score(j) + (2*(j-1) + 1) * legendrePol(j) * p % w * p % k_eff
         end do
       end do
 

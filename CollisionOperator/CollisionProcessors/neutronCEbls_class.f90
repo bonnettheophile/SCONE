@@ -275,7 +275,6 @@ contains
     type(collisionData), intent(inout)   :: collDat
     class(particleDungeon),intent(inout) :: thisCycle
     class(particleDungeon),intent(inout) :: nextCycle
-    type(fissionCE), pointer             :: fission
     type(neutronMicroXSs)                :: microXSs
     real(defReal)                        :: wgtFactor
     character(100),parameter             :: Here = 'implicit (neutronCEbls.f90)'
@@ -316,10 +315,9 @@ contains
     type(collisionData), intent(inout)   :: collDat
     class(particleDungeon),intent(inout) :: thisCycle
     class(particleDungeon),intent(inout) :: nextCycle
-    type(neutronMicroXSs)                :: microXSs
     type(fissionCE), pointer             :: fiss
     type(particleState)                  :: pTemp
-    real(defReal),dimension(3)           :: r, dir, val
+    real(defReal),dimension(3)           :: r, dir
     integer(shortInt)                    :: n, i
     real(defReal)                        :: wgt, rand1, E_out, mu, phi, k_eff
     character(100),parameter             :: Here = 'fission (neutronCEbls_class.f90)'
@@ -337,7 +335,7 @@ contains
         ! Store new site in the next cycle dungeon -> branchless means a single fission neutron
         r   = p % rGlobal()
 
-        n = int(wgt + rand1, shortInt)
+        n = int(wgt/k_eff + rand1, shortInt)
         
         do i = 1, n
           call fiss % sampleOut(mu, phi, E_out, p % E, p % pRNG)
