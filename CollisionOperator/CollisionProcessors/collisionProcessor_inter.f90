@@ -60,6 +60,7 @@ module collisionProcessor_inter
   !!
   type, public, abstract :: collisionProcessor
     private
+    real(defReal), public :: eps ! Parameter for sampling virtual density parameters
   contains
     ! Master non-overridable procedures
     procedure, non_overridable :: collide
@@ -190,7 +191,7 @@ contains
     class(collisionProcessor), intent(inout) :: self
     class(dictionary), intent(in)            :: dict
 
-    ! For now does nothing
+    call dict % getOrDefault(self % eps, 'eps', ZERO)
 
   end subroutine init
 

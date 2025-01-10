@@ -250,6 +250,9 @@ contains
         pTemp % wgt = wgt
         pTemp % collisionN = 0
         pTemp % startPerturbed = 0
+        pTemp % Xold = p % X
+        pTemp % X = 2*p % pRNG % get() - ONE
+        pTemp % f = ONE + pTemp % X * self % eps
 
         call nextCycle % detain(pTemp)
 
