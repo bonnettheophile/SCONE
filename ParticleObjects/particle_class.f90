@@ -63,6 +63,11 @@ module particle_class
     integer(shortInt)          :: uniqueID = -1     ! Unique id at the lowest coord level
     integer(shortInt)          :: collisionN = 0    ! Number of collisions
     integer(shortInt)          :: broodID = 0       ! ID of the source particle
+    real(defReal), dimension(3):: f = ONE   ! Virtual density coefficients
+    real(defReal), dimension(3):: X = ZERO  ! Value of random variable underlying f
+    real(defReal), dimension(3):: Xold = ZERO  ! Value of random variable underlying f
+    real(defReal)              :: k_eff ! k_eff used for implicit fission generation
+
   contains
     generic    :: assignment(=)  => fromParticle
     generic    :: operator(.eq.) => equal_particleState
@@ -110,6 +115,9 @@ module particle_class
     integer(shortInt)          :: type           ! Particle type
     integer(shortInt)          :: collisionN = 0 ! Index of the number of collisions the particle went through
     integer(shortInt)          :: broodID = 0    ! ID of the brood (source particle number)
+    real(defReal), dimension(3):: f = ONE   ! Virtual density coefficients
+    real(defReal), dimension(3):: Xold = ZERO  ! Value of random variable underlying f
+    real(defReal), dimension(3):: X = ZERO  ! Value of random variable underlying f
 
     ! Particle processing information
     class(RNG), pointer        :: pRNG  => null()  ! Pointer to RNG associated with the particle
@@ -185,12 +193,14 @@ contains
   !!   t   -> particle time (default = 0.0)
   !!   type-> particle type (default = P_NEUTRON)
   !!
-  pure subroutine buildCE(self, r, dir, E, w, t, type)
+  pure subroutine buildCE(self, r, dir, E, w, f, X, t, type)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
     real(defReal),intent(in)                :: E
     real(defReal),intent(in)                :: w
+    real(defReal),dimension(3), intent(in), optional :: f
+    real(defReal),dimension(3), intent(in), optional :: X
     real(defReal),optional,intent(in)       :: t
     integer(shortInt),intent(in),optional   :: type
 
@@ -217,6 +227,18 @@ contains
       self % type = P_NEUTRON
     end if
 
+    if (present(f)) then
+      self % f = f
+    else
+      self % f = ONE
+    end if
+
+    if (present(X)) then
+      self % X = X
+    else
+      self % X = ZERO
+    end if
+
   end subroutine buildCE
 
   !!
@@ -230,10 +252,12 @@ contains
   !!   t   -> particle time (default = 0.0)
   !!   type-> particle type (default = P_NEUTRON)
   !!
-  subroutine buildMG(self, r, dir, G, w, t, type)
+  subroutine buildMG(self, r, dir, G, w, f, X, t, type)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
+    real(defReal),dimension(3),intent(in), optional   :: f
+    real(defReal),dimension(3),intent(in), optional   :: X
     real(defReal),intent(in)                :: w
     integer(shortInt),intent(in)            :: G
     real(defReal),intent(in),optional       :: t
@@ -262,6 +286,18 @@ contains
       self % type = P_NEUTRON
     end if
 
+    if (present(f)) then
+      self % f = f
+    else
+      self % f = ONE
+    end if
+
+    if (present(X)) then
+      self % X = X
+    else
+      self % X = ZERO
+    end if
+
   end subroutine buildMG
 
   !!
@@ -276,6 +312,9 @@ contains
     call LHS % takeAboveGeom()
     LHS % coords % lvl(1) % r   = RHS % r
     LHS % coords % lvl(1) % dir = RHS % dir
+    LHS % f                     = RHS % f
+    LHS % X                     = RHS % X
+    LHS % Xold                  = RHS % Xold
     LHS % E                     = RHS % E
     LHS % G                     = RHS % G
     LHS % isMG                  = RHS % isMG
@@ -284,6 +323,7 @@ contains
     LHS % lastPerturbed        = RHS % lastPerturbed
     LHS % type                  = RHS % type
     LHS % time                  = RHS % time
+    LHS % k_eff                 = RHS % k_eff
     LHS % collisionN            = RHS % collisionN
     LHS % splitCount            = 0 ! Reinitialise counter for number of splits
     LHS % broodID               = RHS % broodID
@@ -661,6 +701,9 @@ contains
     LHS % wgt  = RHS % w
     LHS % r    = RHS % rGlobal()
     LHS % dir  = RHS % dirGlobal()
+    LHS % f    = RHS % f
+    LHS % X    = RHS % X
+    LHS % Xold = RHS % Xold
     LHS % E    = RHS % E
     LHS % G    = RHS % G
     LHS % isMG = RHS % isMG
@@ -669,6 +712,7 @@ contains
     LHS % lastPerturbed = RHS % lastPerturbed
     LHS % type = RHS % type
     LHS % time = RHS % time
+    LHS % k_eff = RHS % k_eff
 
     ! Save all indexes
     LHS % matIdx   = RHS % coords % matIdx
@@ -692,6 +736,9 @@ contains
     isEqual = isEqual .and. LHS % wgt == RHS % wgt
     isEqual = isEqual .and. all(LHS % r   == RHS % r)
     isEqual = isEqual .and. all(LHS % dir == RHS % dir)
+    isEqual = isEqual .and. all(LHS % f == RHS % f)
+    isEqual = isEqual .and. all(LHS % X == RHS % X)
+    isEqual = isEqual .and. all(LHS % Xold == RHS % Xold)
     isEqual = isEqual .and. LHS % time == RHS % time
     isEqual = isEqual .and. LHS % isMG .eqv. RHS % isMG
     isEqual = isEqual .and. LHS % isPerturbed .eqv. RHS % isPerturbed
@@ -703,6 +750,7 @@ contains
     isEqual = isEqual .and. LHS % uniqueID == RHS % uniqueID
     isEqual = isEqual .and. LHS % collisionN == RHS % collisionN
     isEqual = isEqual .and. LHS % broodID    == RHS % broodID
+    isEqual = isEqual .and. LHS % k_eff   == RHS % k_eff
 
     if( LHS % isMG ) then
       isEqual = isEqual .and. LHS % G == RHS % G
@@ -735,6 +783,9 @@ contains
 
     self % wgt  = ZERO
     self % r    = ZERO
+    self % f    = ONE
+    self % X    = ZERO
+    self % Xold    = ZERO
     self % dir  = ZERO
     self % E    = ZERO
     self % G    = 0
@@ -749,6 +800,7 @@ contains
     self % uniqueID = -1
     self % collisionN = 0
     self % broodID    = 0
+    self % k_eff = ZERO
 
   end subroutine kill_particleState
 
