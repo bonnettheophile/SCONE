@@ -36,12 +36,13 @@ module transportOperatorDT_class
   !!
   type, public, extends(transportOperator) :: transportOperatorDT
 !   Data definitions for virtual density module  !
-    real(defReal)                  :: product_factor 
-    real(defReal), dimension(3)    :: vector_factor, vector_factor_cur
-    logical(defBool)               :: virtual_density, cross_over = .false.
-    character(nameLen)             :: deform_type, direction_type, scale_type
-    character(nameLen)             :: perturb_mat
-    integer(shortInt),dimension(6) :: pert_Mat_Id = 0
+    real(defReal)                    :: product_factor 
+    real(defReal), dimension(3)      :: vector_factor, vector_factor_cur
+    logical(defBool)                 :: virtual_density, cross_over = .false.
+    character(nameLen)               :: deform_type, direction_type, scale_type
+    character(nameLen), allocatable  :: pert_mat(:)
+    integer(shortInt), allocatable   :: pert_mat_id(:)
+    integer(shortInt)                :: nb_pert_mat
 !   Data definitions for virtual density module  !
   contains
     procedure :: transit => deltaTracking
@@ -64,10 +65,10 @@ contains
 !   Data definitions for virtual density module  !
     real(defReal),dimension(3)                :: cosines,virtual_cosines, real_vector, virtual_vector, virtual_XS
     real(defReal)                             :: virtual_dist, flight_stretch_factor, virtual_XS_max_inv
-    character(nameLen)                        :: test_name = 'clad'
-    real(defReal)                             :: enquiry_XS_test
+    character(nameLen)                        :: test_name = 'fuel', test_name2 = 'clad'
+    real(defReal),dimension(2)                             :: enquiry_XS_test
     real(defReal)                             :: enquiry_XS_max
-    integer(shortInt)                         :: mat_Idx_unpert = 0, mat_Idx_pert = 0
+    integer(shortInt)                         :: mat_Idx_unpert = 0, mat_Idx_pert = 0, index = 1
     logical(defBool)                          :: weight_pert, denizen_pert, pert_region
 
 !   Data definitions for virtual density end here!
@@ -79,15 +80,22 @@ contains
 
     DTLoop:do
       distance = -log( p % pRNG % get() ) * majorant_inv
-       if (self % virtual_density) then
-          if (trim(self % scale_type) == 'non_uniform') then
-               if (any(self % pert_Mat_id == p % matIdx())) then
-                self % vector_factor = self % vector_factor_cur
-                self % deform_type = 'swelling'
-               else
-                 self % vector_factor = ONE
-               end if
-           end if
+      if (self % virtual_density) then
+        if (trim(self % scale_type) == 'non_uniform') then
+          if (any(self % pert_mat_id == p % matIdx())) then
+            p % isPerturbed = .true. ! Set particle to be perturbed
+            if (p % startPerturbed == 0) then
+              p % startPerturbed = 1 ! Set particle starting in perturbed region
+              p % lastPerturbed = .true.
+            end if
+          else
+            p % isPerturbed = .false.
+            if (p % startPerturbed == 0) then 
+              p % startPerturbed = 2 ! Set particle starting in unperturbed region
+              p % lastPerturbed = .false.
+            end if
+          end if
+        end if
 
           if (((trim(self % scale_type) == 'non_uniform') .and. (any(self % pert_Mat_id == p % matIdx()))) &
               .or. (trim(self % scale_type) == 'uniform')) then    
@@ -115,66 +123,44 @@ contains
                call p % point(virtual_cosines)
                distance = virtual_dist
 
-               denizen_pert = .true.    ! Indicates that this neutron has been found inside perturbed region
-           end if
-          if (trim(self % scale_type) == 'non_uniform') then
-            if (any(self % pert_Mat_id == p % matIdx())) then
-               pert_region = .true.         ! indicates neutron is in perturbed region
-               mat_Idx_pert = p % matIdx()
-               mat_Idx_unpert = 0
-             else
-               pert_region = .false.         ! indicates prisoner is in unperturbed region
-               mat_Idx_unpert = p % matIdx()
-               mat_Idx_pert = 0
-            end if
-         end if
-       end if
-      ! Move partice in the geometry
+        end if
+      end if
+    ! Move partice in the geometry
 
       call self % geom % teleport(p % coords, distance)
 
+      if (trim(self % scale_type) == 'non_uniform') then
+        if (any(self % pert_mat_id == p % matIdx())) then
+            p % isPerturbed = .true.
+          else
+            p % isPerturbed = .false.
+        end if
+      end if
+
       if ((self % virtual_density) .and. (trim(self % scale_type) == 'non_uniform')) then
-
-         if ((pert_region) .and. (all(self % pert_Mat_id /= p % matIdx()))) then !&.and. (p % matIdx() /= OUTSIDE_FILL)) then
-              pert_region = .false.
-
-              if ((abs(p % w - ONE) < 1e-5) .or. (abs(p % w - TWO) < 1e-5)) then ! prisoner is crossing over from its original perturbed cell to an unperturbed region
-                self % cross_over = .true.         ! marks the prisoner to have crossed over to a new region
-                p % w = p % w / (1.0 + ((self % vector_factor(3) - ONE) / ONE))   ! Weight is perturbed on cross-over to a new region  
-              elseif ((abs(p % w - (ONE / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5) &
-               .or. (abs(p % w - (TWO / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5)) then ! prisoner has now gone back to his original region!
-                self % cross_over = .true.         ! markes the prisoner to have crossed over to a new region !
-                p % w = p % w * (ONE + ((self % vector_factor(3) - ONE) / ONE))  ! Weight is perturbed on cross-over to a new region
-              end if
-
-          elseif  ((.not. pert_region) .and. (any(self % pert_Mat_id == p % matIdx()))) then
-              pert_region = .true.
-              if ((abs(p % w - ONE) < 1e-5) .or. (abs(p % w - TWO) < 1e-5)) then ! prisoner is crossing over from his original region to a new region !
-                self % cross_over = .true.         ! markes the prisoner to have crossed over to a new region !
-                p % w = p % w / (ONE + ((self % vector_factor(3) - ONE) / ONE))   ! Weight is perturbed on cross-over to a new region
-              elseif ((abs(p % w - (ONE / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5) &
-               .or. (abs(p % w - (TWO / (ONE + ((self % vector_factor(3) - ONE) / ONE)))) < 1e-5)) then ! prisoner has now gone back to his original region!
-                self % cross_over = .false.         ! markes the prisoner is now back in his original region !
-                p % w = p % w * (ONE + ((self % vector_factor(3) - ONE) / ONE))    ! Weight perturbation is removed since the prisoner no longer contributes to the current
-             end if
-                  
+        if (( p % lastPerturbed .eqv. .false.) .and. p % isPerturbed) then
+          if (p % startPerturbed == 1) then
+            !p % w = p % w / self % vector_factor(3)
+            p % w = p % w / self % vector_factor(3)**2 !isotropic swelling
+          else
+            p % w = p % w * self % vector_factor(3)**2 !isotropic swelling
+            !p % w = p % w * self % vector_factor(3)
           end if
-            if ((p % w < 0.88) .and. ((self % vector_factor(3) - ONE) > 1e-5)) then
-                call fatalError(Here, "Warning! Incorrect current perturbation!")
-                print *,'mat_Idx_unpert,mat_Idx_pert, p % matIdx() = ',mat_Idx_unpert, mat_Idx_pert, p % matIdx()
-                print *,'p % w = ',p % w
-                print *,'pert_region_cond, self % cross_over_cond = ', pert_region, self % cross_over
-            end if                
-       end if
+        elseif (( p % lastPerturbed) .and. (p % isPerturbed .eqv. .false.)) then
+          if (p % startPerturbed == 1) then
+            p % w = p % w * self % vector_factor(3)**2 !isotropic swelling
+            !p % w = p % w / self % vector_factor(3)
+          else
+            p % w = p % w / self % vector_factor(3)**2 !isotropic swelling
+            !p % w = p % w * self % vector_factor(3)
+          end if
+        end if
+        p % lastPerturbed = p % isPerturbed
+      end if              
 
       ! If particle has leaked exit
       if (p % matIdx() == OUTSIDE_FILL) then
         p % fate = LEAK_FATE
-            !if ((abs(p % w - ONE / (ONE + ((self % vector_factor(3) - ONE) / TWO))) < 1e-5) .or. &
-             !(abs(p % w - TWO / (ONE + ((self % vector_factor(3) - ONE) / TWO))) < 1e-5)) then ! prisoner has now gone back to his original region!
-                !p % w = p % w * (ONE + ((self % vector_factor(3) - ONE) / TWO))
-                !print *,'p % w = ',p % w
-            !end if
         p % isDead = .true.
         return
       end if
@@ -192,6 +178,7 @@ contains
       end if
 
       ! Obtain the local cross-section
+      
       sigmaT = self % xsData % getTrackMatXS(p, p % matIdx())
 
       ! Roll RNG to determine if the collision is real or virtual
@@ -210,6 +197,8 @@ contains
   subroutine init(self, dict)
     class(transportOperatorDT), intent(inout) :: self
     class(dictionary), intent(in)             :: dict
+    character(nameLen)                        :: tmp = 'pert_mat'
+    integer(shortInt)                         :: index
          !Virtual Density Data call  begins !
 
     call init_super(self, dict)
@@ -233,8 +222,14 @@ contains
         self % product_factor = self % vector_factor(1) * self % vector_factor(2) * self % vector_factor(3)
 
         if (trim(self % scale_type) == 'non_uniform') then
-              call dict % getorDefault(self % perturb_mat, 'pert_mat','uniform')
-              self % pert_Mat_Id(1) = mm_matIdx(self % perturb_mat)
+          call dict % getorDefault(self % nb_pert_mat, 'nb_pert_mat', 1)
+          allocate(self % pert_mat(self % nb_pert_mat))
+          allocate(self % pert_mat_id(self % nb_pert_mat))
+          do index = 1, self % nb_pert_mat
+            write(tmp, "(A)") index
+            call dict % getorDefault(self % pert_mat(index), trim(tmp),'uniform')
+            self % pert_mat_id(index) = mm_matIdx(self % pert_mat(index))
+          end do
         end if
       end if
 !    Virtual Density Data call  ends !
