@@ -380,7 +380,7 @@ contains
     end if
 
     ! Apply weigth change
-    p % w = p % w * reac % release(p % E)
+    ! p % w = p % w * reac % release(p % E)
     if (p % w /= ONE) p % hasN2N = .true.
     call splitting (self, p, thisCycle)
 

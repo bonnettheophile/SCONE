@@ -502,7 +502,7 @@ contains
 
     ! Parallel buffer size
     call dict % getOrDefault( self % bufferSize, 'buffer', 50)
-
+    print *, self % bufferSize
     ! Whether to use combing (default = no)
     call dict % getOrDefault(self % useCombing, 'combing', .false.)
 
@@ -577,6 +577,7 @@ contains
     allocate(self % currentTime(self % N_cycles))
     allocate(self % nextTime(self % N_cycles))
 
+    print *, self % bufferSize
     do i = 1, self % N_cycles
       call self % currentTime(i) % init(self % bufferSize)
       call self % nextTime(i) % init(self % bufferSize)
