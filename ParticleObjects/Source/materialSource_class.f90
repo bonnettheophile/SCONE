@@ -141,7 +141,7 @@ contains
     class(neutronMaterial), pointer      :: mat
     real(defReal), dimension(3)          :: r, rand3
     real(defReal)                        :: mu, phi
-    integer(shortInt)                    :: matIdx, uniqueID, i
+    integer(shortInt)                    :: matIdx, uniqueID, i, j
     character(100), parameter :: Here = 'sampleParticle (materialSource_class.f90)'
 
     ! Get pointer to appropriate nuclear database
@@ -186,8 +186,10 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
-      p % X    = 2 * rand % get() - ONE
-      p % f    = ONE + p % X * self % eps
+      do j = 1, 3
+        p % X(j) = 2 * rand % get() - ONE
+        p % f(j) = ONE + p % X(j) * 0.05
+      end do
 
       mu = TWO * rand % get() - ONE
       phi = TWO_PI * rand % get()

@@ -159,7 +159,7 @@ contains
     type(fissionMG), pointer             :: fissMG
     real(defReal), dimension(3)          :: r, rand3
     real(defReal)                        :: mu, phi, E_out, E_up, E_down
-    integer(shortInt)                    :: matIdx, uniqueID, nucIdx, i, G_out
+    integer(shortInt)                    :: matIdx, uniqueID, nucIdx, i, j, G_out
     character(100), parameter :: Here = 'sampleParticle (fissionSource_class.f90)'
 
     ! Get pointer to appropriate nuclear database
@@ -204,8 +204,10 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
-      p % X    = 2 * rand % get() - ONE
-      p % f        = ONE + p % X * self % eps
+      do j = 1, 3
+        p % X(j) = 2 * rand % get() - ONE
+        p % f(j) = ONE + p % X(j) * 0.05
+      end do
 
 
       ! Set Energy
