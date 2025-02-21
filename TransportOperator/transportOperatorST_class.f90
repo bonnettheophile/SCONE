@@ -129,6 +129,7 @@ contains
             first_flight = .false.
           else if (trim(self % scale_type) == 'non_uniform') then
             call p % point(virtual_cosines)
+            first_flight = .false.
           end if
           dist = virtual_dist
           
