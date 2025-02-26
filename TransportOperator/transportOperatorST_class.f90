@@ -33,21 +33,21 @@ module transportOperatorST_class
   !! Transport operator that moves a particle with surface tracking
   !!
   !! Sample Input Dictionary:
-  !!   trans { type transportOperatorST; cache 0;}
+  !!   trans { type transportOperatorST; cache 0; }
   !!
-  type, public, extends(transportOperator) :: transportOperatorST
+  type, public, extends(transportOperator):: transportOperatorST
     logical(defBool)  :: cache = .true.
     real(defReal)                    :: product_factor 
     real(defReal), dimension(:,:), allocatable      :: vector_factor
-    logical(defBool)                 :: virtual_density, cross_over = .false.
+    logical(defBool)                 :: virtual_density, cross_over = .false., swelled
     character(nameLen)               :: direction_type, scale_type
     character(nameLen), allocatable  :: pert_mat(:), deform_type(:)
     integer(shortInt), allocatable   :: pert_mat_id(:)
     integer(shortInt)                :: nb_pert_mat
   contains
-    procedure :: transit => surfaceTracking
+    procedure:: transit => surfaceTracking
     ! Override procedure
-    procedure :: init
+    procedure:: init
   end type transportOperatorST
 
 contains
@@ -56,17 +56,17 @@ contains
   !! Performs surface tracking until a collision point is found
   !!
   subroutine surfaceTracking(self, p, tally, thisCycle, nextCycle)
-    class(transportOperatorST), intent(inout) :: self
+    class(transportOperatorST), intent(inout):: self
     class(particle), intent(inout)            :: p
     type(tallyAdmin), intent(inout)           :: tally
-    class(particleDungeon),intent(inout)      :: thisCycle
-    class(particleDungeon),intent(inout)      :: nextCycle
+    class(particleDungeon), intent(inout)      :: thisCycle
+    class(particleDungeon), intent(inout)      :: nextCycle
     integer(shortInt)                         :: event, i, current_mat
     real(defReal)                             :: sigmaT, dist, virtual_dist, flight_stretch_factor
-    real(defReal),dimension(3)                :: cosines,virtual_cosines, real_vector, virtual_vector
+    real(defReal), dimension(3)                :: cosines, virtual_cosines, real_vector, virtual_vector
     type(distCache)                           :: cache
     logical(defBool)                          :: repoint, first_flight
-    character(100), parameter :: Here = 'surfaceTracking (transportOperatorST_class.f90)'
+    character(100), parameter:: Here = 'surfaceTracking (transportOperatorST_class.f90)'
     first_flight = .true.
     STLoop: do
 
@@ -76,9 +76,9 @@ contains
 
       else
         sigmaT = self % xsData % getTrackingXS(p, p % matIdx(), MATERIAL_XS)
-        dist = -log( p % pRNG % get()) / sigmaT
+        dist = -log( p % pRNG % get()) / sigmaT*self % product_factor
 
-        ! Should never happen! Catches NaN distances
+        ! Should never happen  ! Catches NaN distances
         if (dist /= dist) then 
           print *, p % matIdx()
           call fatalError(Here, "Distance is NaN")
@@ -94,7 +94,7 @@ contains
           do i = 1, self % nb_pert_mat 
             if (self % pert_mat_id(i) == p % matIdx()) then
               p % isPerturbed = .true. ! Set particle to be perturbed
-              current_mat = i ! Set current perturbated material
+              current_mat = i  ! Set current perturbated material
               exit
             end if
           end do
@@ -102,32 +102,32 @@ contains
 
         if (p % isPerturbed .or. trim(self % scale_type) == 'uniform') then
           cosines(:) = p % dirGlobal()
-          real_vector = dist * cosines
+          real_vector = dist*cosines
           if (self % deform_type(current_mat) == 'swelling') then
-            virtual_vector(1) = real_vector(1) * self % vector_factor(2,current_mat) * self % vector_factor(3, current_mat)
-            virtual_vector(2) = real_vector(2) * self % vector_factor(1,current_mat) * self % vector_factor(3,current_mat)
-            virtual_vector(3) = real_vector(3) * self % vector_factor(1,current_mat) * self % vector_factor(2,current_mat)
+            virtual_vector(1) = real_vector(1) * self % vector_factor(2, current_mat) * self % vector_factor(3, current_mat)
+            virtual_vector(2) = real_vector(2) * self % vector_factor(1, current_mat) * self % vector_factor(3, current_mat)
+            virtual_vector(3) = real_vector(3) * self % vector_factor(1, current_mat) * self % vector_factor(2, current_mat)
             virtual_dist = sqrt(sum(virtual_vector**2))
-            flight_stretch_factor = virtual_dist / dist
-            virtual_cosines(1) = cosines(1) * self % vector_factor(2,current_mat) * &
-                self % vector_factor(3,current_mat) / flight_stretch_factor
-            virtual_cosines(2) = cosines(2) * self % vector_factor(1,current_mat) * &
-                self % vector_factor(3,current_mat) / flight_stretch_factor
-            virtual_cosines(3) = cosines(3) * self % vector_factor(1,current_mat) * &
-                self % vector_factor(2,current_mat) / flight_stretch_factor
+            flight_stretch_factor = virtual_dist/dist
+            virtual_cosines(1) = cosines(1) * self % vector_factor(2, current_mat) * &
+                self % vector_factor(3, current_mat) / flight_stretch_factor
+            virtual_cosines(2) = cosines(2) * self % vector_factor(1, current_mat) * &
+                self % vector_factor(3, current_mat) / flight_stretch_factor
+            virtual_cosines(3) = cosines(3) * self % vector_factor(1, current_mat) * &
+                self % vector_factor(2, current_mat) / flight_stretch_factor
           elseif (self % deform_type(current_mat) == 'expansion') then
-            virtual_vector = real_vector / self % vector_factor(:,current_mat) 
+            virtual_vector = real_vector/self % vector_factor(:,current_mat) 
             virtual_dist = sqrt(sum(virtual_vector**2))
             flight_stretch_factor = virtual_dist/dist
             virtual_cosines = cosines / (self % vector_factor(:,current_mat)*flight_stretch_factor)
           else
-            call fatalError(Here,'Unrecognised geometric deformation')
+            call fatalError(Here, 'Unrecognised geometric deformation')
           end if
         
           if (first_flight .and. trim(self % scale_type) == 'uniform') then
             call p % point(virtual_cosines)
             first_flight = .false.
-          else if (trim(self % scale_type) == 'non_uniform') then
+          else if (first_flight .and. trim(self % scale_type) == 'non_uniform') then
             call p % point(virtual_cosines)
             first_flight = .false.
           end if
@@ -162,6 +162,7 @@ contains
         ! If crossing to unperturbed region, recover non perturbed direction
         if ( (p % lastPerturbed .and. (.not. p % isPerturbed))) then 
           call p % point(cosines)
+          first_flight = .true.
         end if
       end if
 
@@ -193,7 +194,7 @@ contains
   !! See transportOperator_inter for details
   !!
   subroutine init(self, dict)
-    class(transportOperatorST), intent(inout) :: self
+    class(transportOperatorST), intent(inout):: self
     class(dictionary), intent(in)             :: dict
     character(nameLen)                        :: input
     real(defReal), allocatable, dimension(:)  :: vec                           
@@ -204,6 +205,16 @@ contains
 
     ! Initialise virtual density
     call dict % getorDefault(self % virtual_density, 'virtual_density', .false.)
+    call dict % getorDefault(self % swelled, 'swelled', .false.)
+    self % product_factor = ONE
+    if (self % swelled) then
+        allocate(self % deform_type(1))
+        allocate(self % vector_factor(3, 1))
+        call dict % get(self % deform_type(1), "deform_type_1")
+        call dict % get(vec, "factor_1")
+        self % vector_factor(:,1) = vec
+        self % product_factor = product(self % vector_factor)
+    end if
     if (self % virtual_density) then
       call dict % getorDefault(self % direction_type, 'direction_type','isotropic')
       call dict % getorDefault(self % scale_type, 'scale','uniform')
@@ -238,7 +249,7 @@ contains
         end do
       else
         allocate(self % deform_type(1))
-        allocate(self % vector_factor(3,1))
+        allocate(self % vector_factor(3, 1))
         call dict % get(self % deform_type(1), "deform_type_1")
         call dict % get(vec, "factor_1")
         self % vector_factor(:,1) = vec
