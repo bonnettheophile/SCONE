@@ -215,6 +215,7 @@ contains
     call dict % getorDefault(self % swelled, 'swelled', .false.)
     self % product_factor = ONE
     if (self % swelled) then
+      call dict % get(self % nb_swelled_mat, 'nb_swelled_mat')
       allocate(self % swelled_mat(self % nb_swelled_mat))
       allocate(self % swelled_mat_id(self % nb_swelled_mat))
       call dict % get(vec, 'swelling_factor')
