@@ -37,13 +37,13 @@ module transportOperatorST_class
   !!
   type, public, extends(transportOperator):: transportOperatorST
     logical(defBool)  :: cache = .true.
-    real(defReal)                    :: product_factor 
+    real(defReal)                    :: product_factor
     real(defReal), dimension(:,:), allocatable      :: vector_factor
     logical(defBool)                 :: virtual_density, cross_over = .false., swelled
     character(nameLen)               :: direction_type, scale_type
-    character(nameLen), allocatable  :: pert_mat(:), deform_type(:)
-    integer(shortInt), allocatable   :: pert_mat_id(:)
-    integer(shortInt)                :: nb_pert_mat
+    character(nameLen), allocatable  :: pert_mat(:), deform_type(:), swelled_mat(:)
+    integer(shortInt), allocatable   :: pert_mat_id(:), swelled_mat_id(:)
+    integer(shortInt)                :: nb_pert_mat, nb_swelled_mat
   contains
     procedure:: transit => surfaceTracking
     ! Override procedure
@@ -66,8 +66,12 @@ contains
     real(defReal), dimension(3)                :: cosines, virtual_cosines, real_vector, virtual_vector
     type(distCache)                           :: cache
     logical(defBool)                          :: repoint, first_flight
+    real(defReal)                             :: current_product_factor
     character(100), parameter:: Here = 'surfaceTracking (transportOperatorST_class.f90)'
+
     first_flight = .true.
+    current_product_factor = ONE
+
     STLoop: do
 
       ! Obtain the local cross-section
@@ -75,12 +79,15 @@ contains
         dist = INFINITY
 
       else
+        if (self % swelled) then
+          current_product_factor = ONE
+          if (any(self % swelled_mat_id == p % matIdx())) current_product_factor = self % product_factor
+        end if
         sigmaT = self % xsData % getTrackingXS(p, p % matIdx(), MATERIAL_XS)
-        dist = -log( p % pRNG % get()) / sigmaT*self % product_factor
+        dist = -log( p % pRNG % get()) / sigmaT * current_product_factor
 
         ! Should never happen  ! Catches NaN distances
         if (dist /= dist) then 
-          print *, p % matIdx()
           call fatalError(Here, "Distance is NaN")
         end if
 
@@ -208,12 +215,17 @@ contains
     call dict % getorDefault(self % swelled, 'swelled', .false.)
     self % product_factor = ONE
     if (self % swelled) then
-        allocate(self % deform_type(1))
-        allocate(self % vector_factor(3, 1))
-        call dict % get(self % deform_type(1), "deform_type_1")
-        call dict % get(vec, "factor_1")
-        self % vector_factor(:,1) = vec
-        self % product_factor = product(self % vector_factor)
+      allocate(self % swelled_mat(self % nb_swelled_mat))
+      allocate(self % swelled_mat_id(self % nb_swelled_mat))
+      call dict % get(vec, 'swelling_factor')
+      self % product_factor = product(vec)
+      do index = 1, self % nb_swelled_mat
+        input = 'swelled_mat_'
+        write(input, '(I0)') index
+        input = trim('swelled_mat_')//trim(input)
+        call dict % get(self % swelled_mat(index), trim(input))
+        self % swelled_mat_id(index) = mm_matIdx(self % swelled_mat(index))
+      end do
     end if
     if (self % virtual_density) then
       call dict % getorDefault(self % direction_type, 'direction_type','isotropic')
