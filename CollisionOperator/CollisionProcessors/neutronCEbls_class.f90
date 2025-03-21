@@ -45,6 +45,8 @@ module neutronCEbls_class
   implicit none
   private
 
+  integer(shortInt), parameter, public :: AXIAL = 1, RADIAL = 2, ISOTROPIC = 3, NONE = 4
+
   !!
   !! Standard scalar collision processor for CE neutrons
   !!   -> Preforms implicit or analog fission site generation
@@ -120,6 +122,7 @@ module neutronCEbls_class
     logical(defBool)  :: implicitAbsorption ! Prevents particles dying through capture
     logical(defBool)  :: implicitSites ! Generates fission sites on every fissile collision
     logical(defBool)  :: uniFissSites
+    integer(shortInt) :: kind
 
     ! Variance reduction requirements
     type(weightWindowsField), pointer :: weightWindowsMap
@@ -156,11 +159,24 @@ contains
     class(neutronCEbls), intent(inout) :: self
     class(dictionary), intent(in)      :: dict
     integer(shortInt)                  :: idx
+    character(nameLen)                 :: str
     character(100), parameter :: Here = 'init (neutronCEbls_class.f90)'
 
     ! Call superclass
     call init_super(self, dict)
 
+    call dict % get(str, 'kind')
+
+    select case(str)
+      case('axial')
+        self % kind = AXIAL
+      case('radial')
+        self % kind = RADIAL
+      case('isotropic')
+        self % kind = ISOTROPIC
+      case default
+        self % kind = NONE
+    end select
     ! Read settings for neutronCEbls
     ! Maximum and minimum energy
     call dict % getOrDefault(self % minE,'minEnergy',1.0E-11_defReal)
@@ -353,9 +369,16 @@ contains
           pTemp % collisionN = 0
           pTemp % wgt = ONE
           pTemp % Xold = p % X
-          if (self % isotropic_pert) then 
+          if (self % kind == ISOTROPIC) then 
             pTemp % X = 2*p % pRNG % get() - ONE
             pTemp % f = ONE + pTemp % X * self % eps
+          else if (self % kind == RADIAL) then
+            pTemp % X = 2*p % pRNG % get() - ONE
+            pTemp % X(3) = ZERO
+          else if (self % kind == AXIAL) then
+            pTemp % X(1) = 2*p % pRNG % get() - ONE
+            pTemp % X(2) = ZERO
+            pTemp % X(3) = ZERO
           else
             do j = 1, 3
               pTemp % X(j) = 2 * p % pRNG % get() - 1
