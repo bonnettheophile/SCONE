@@ -221,12 +221,6 @@ contains
                 end do
               end do
             end do
-            if (score == ZERO) then 
-              print *, legendrePol(1,:)
-              print *, legendrePol(2,:)
-              print *, legendrePol(3,:)
-              print *, j1,j2,j3
-            end if
 
             tmp_score(j1,j2,j3) = tmp_score(j1,j2,j3) + score
           end do
