@@ -375,10 +375,12 @@ contains
           else if (self % kind == RADIAL) then
             pTemp % X = 2*p % pRNG % get() - ONE
             pTemp % X(3) = ZERO
+            pTemp % f = ONE + pTemp % X * self % eps
           else if (self % kind == AXIAL) then
             pTemp % X(1) = 2*p % pRNG % get() - ONE
             pTemp % X(2) = ZERO
             pTemp % X(3) = ZERO
+            pTemp % f = ONE + pTemp % X * self % eps
           else
             do j = 1, 3
               pTemp % X(j) = 2 * p % pRNG % get() - 1
