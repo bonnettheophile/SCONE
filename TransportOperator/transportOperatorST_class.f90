@@ -65,9 +65,7 @@ contains
     real(defReal)                             :: sigmaT, dist, virtual_dist, flight_stretch_factor
     real(defReal), dimension(3)                :: cosines, preCosines, virtual_cosines, real_vector, virtual_vector
     type(distCache)                           :: cache
-    logical(defBool)                          :: repoint, first_flight
     character(100), parameter:: Here = 'surfaceTracking (transportOperatorST_class.f90)'
-    !first_flight = .true.
 
     preCosines = p % dirGlobal()
     STLoop: do
@@ -104,7 +102,6 @@ contains
 
         if (p % isPerturbed .or. trim(self % scale_type) == 'uniform') then
           cosines(:) = preCosines
-          !cosines(:) = p % dirGlobal()
           real_vector = dist*cosines
           if (self % deform_type(current_mat) == 'swelling') then
             virtual_vector(1) = real_vector(1) * self % vector_factor(2, current_mat) * self % vector_factor(3, current_mat)
@@ -127,10 +124,7 @@ contains
             call fatalError(Here, 'Unrecognised geometric deformation')
           end if
         
-          !if (first_flight) then
-            call p % point(virtual_cosines)
-          !  first_flight = .false.
-          !end if
+          call p % point(virtual_cosines)
           dist = virtual_dist
           
         end if
@@ -142,37 +136,14 @@ contains
       ! Move to the next stop.
       if (self % cache) then
         call self % geom % move_withCache(p % coords, dist, event, cache)
-
       else
         call self % geom % move(p % coords, dist, event)
-
       end if
+      
+      ! Recover initial direction
+      call p % point(preCosines)
       ! Send tally report for a path moved
       call tally % reportPath(p, dist)
-
-      !if (self % virtual_density .and. trim(self % scale_type) == 'non_uniform') then 
-      !  p % lastPerturbed = p % isPerturbed
-      !  repoint = .false.
-      !  if (any(self % pert_mat_id == p % matIdx())) then
-      !    p % isPerturbed = .true.
-      !  else
-      !    p % isPerturbed = .false.
-      !  end if
-
-        ! If crossing to unperturbed region, recover non perturbed direction
-      !  if ( (p % lastPerturbed .and. (.not. p % isPerturbed))) then 
-      !    call p % point(cosines)
-      !    first_flight = .true.
-      !  end if
-      !end if
-
-      !if (self % virtual_density .and. event == BOUNDARY_EV) then
-      !  preCosines = p % dirGlobal()
-      !end if
-
-      !if (self % virtual_density .and. event == CROSS_EV) then
-      !  call p % point(preCosines)
-      !end if
 
       ! Kill particle if it has leaked
       if (p % matIdx() == OUTSIDE_FILL) then
