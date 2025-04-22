@@ -38,6 +38,8 @@ module source_inter
     logical(defBool), public               :: isPoisson = .false.
     real(defReal), public                  :: poissonTime
     real(defReal), public                  :: finalPoissonTime = -ONE
+    real(defReal), public                  :: poissonIntensity
+    
   contains
     procedure, non_overridable             :: generate
     procedure(sampleParticle), deferred    :: sampleParticle

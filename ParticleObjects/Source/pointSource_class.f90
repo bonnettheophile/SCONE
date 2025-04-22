@@ -64,7 +64,6 @@ module pointSource_class
     integer(shortInt)                         :: particleType = P_NEUTRON
     logical(defBool)                          :: isMG         = .false.
     logical(defBool)                          :: isIsotropic  = .false.
-    real(defReal)                             :: poissonIntensity
   contains
     procedure :: init
     procedure :: sampleType
