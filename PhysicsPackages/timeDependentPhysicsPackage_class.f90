@@ -445,7 +445,9 @@ contains
     call out % printValue(self % N_timeBins, name)
 
     name = 'Poisson_source'
-    call out % printValue(self % poissonSource % poissonIntensity, name)
+    if (allocated(self % poissonSource)) then
+      call out % printValue(self % poissonSource % poissonIntensity, name)
+    end if
 
     call cpu_time(self % CPU_time_end)
     name = 'Total_CPU_Time'

@@ -159,7 +159,7 @@ contains
 
       if (type == "neutronResponse") then
         allocate(self % neutrons)
-        call self % neutrons % init(20 * self % maxPop)
+        call self % neutrons % init(20)
         allocate(self % currentNeutronPops(self % cycles))
         allocate(self % firstHitsNeutron(self % cycles))
         allocate(self % hittingTimesNeutron(self % cycles))
