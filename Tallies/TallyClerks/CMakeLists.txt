@@ -17,6 +17,7 @@ add_sources(./tallyClerk_inter.f90
             ./nuAnalogClerk_class.f90
             ./lambdaAnalogClerk_class.f90
             ./lifetimeClerk_class.f90
+            ./leakRateClerk_class.f90
              )
              
 add_unit_tests(./Tests/collisionClerk_test.f90
