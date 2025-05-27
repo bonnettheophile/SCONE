@@ -279,7 +279,7 @@ contains
     type(neutronMicroXSs)                :: microXSs
     type(particleState)                  :: pTemp
     real(defReal),dimension(3)           :: r, dir, val
-    integer(shortInt)                    :: n, i
+    integer(shortInt)                    :: n, i, j
     real(defReal)                        :: wgt, rand1, E_out, mu, phi
     real(defReal)                        :: sig_nufiss, sig_tot, k_eff, &
                                             sig_scatter, totalElastic
@@ -338,6 +338,21 @@ contains
         pTemp % E   = E_out
         pTemp % wgt = wgt
         pTemp % collisionN = 0
+
+        ! Set first undefined ancestor
+        do j = 1, size(pTemp % ifpAncestorsID)
+          if (pTemp % ifpAncestorsID(j) /= 0) then
+            pTemp % ifpAncestorWgt(j) = pTemp % ifpAncestorWgt(j) * k_eff
+          else
+            ! Save youngest ancestor ID and state
+            pTemp % ifpAncestorsID(j) = pTemp % ifpID
+            pTemp % ifpAncestorStates(j) = p % preHistory
+            ! Update contribution factor due to weight renormalisation
+            pTemp % ifpAncestorWgt(j) = k_eff
+            ! Exit to avoid modyfing yet unseen generations
+            exit
+          end if
+        end do
 
         call nextCycle % detain(pTemp)
         if (self % uniFissSites) call self % ufsField % storeFS(pTemp)
