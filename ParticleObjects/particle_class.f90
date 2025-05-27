@@ -23,7 +23,7 @@ module particle_class
   public :: printType
 
   !!
-  !! Particle compressed for storage
+  !! Ancestor particle compressed for storage
   !!
   !! Public Members:
   !!   wgt      -> Weight of the particle
@@ -47,6 +47,60 @@ module particle_class
   !!   operator(.eq.) -> Return True if particle are exactly the same
   !!   display        -> Print debug information about the state to the console
   !!
+  type, public :: ancestorState
+    real(defReal)              :: wgt  = ZERO       ! Particle weight
+    real(defReal),dimension(3) :: r    = ZERO       ! Global position
+    real(defReal),dimension(3) :: dir  = ZERO       ! Global direction
+    real(defReal)              :: E    = ZERO       ! Energy
+    integer(shortInt)          :: G    = 0          ! Energy group
+    logical(defBool)           :: isMG = .false.    ! Is neutron multi-group
+    integer(shortInt)          :: type = P_NEUTRON  ! Particle physical type
+    real(defReal)              :: time = ZERO       ! Particle time position
+    integer(shortInt)          :: matIdx   = -1     ! Material index where particle is
+    integer(shortInt)          :: cellIdx  = -1     ! Cell idx at the lowest coord level
+    integer(shortInt)          :: uniqueID = -1     ! Unique id at the lowest coord level
+    integer(shortInt)          :: collisionN = 0    ! Number of collisions
+    integer(shortInt)          :: broodID = 0       ! ID of the source particle
+    integer(shortInt)          :: ifpID = 0         ! ID for IFP estimator
+
+
+  contains
+    generic    :: assignment(=)  => ancestorFromParticleState
+    procedure  :: ancestorFromParticleState   => ancestorState_fromParticleState
+    procedure  :: kill           => kill_ancestorState
+
+  end type ancestorState
+
+  !!
+  !! Particle compressed for storage
+  !!
+  !! Public Members:
+  !!   wgt      -> Weight of the particle
+  !!   r        -> Global Position of the particle [cm]
+  !!   dir      -> Direction vector of the particle (normalised to 1.0)
+  !!   E        -> Energy of the particle [MeV]
+  !!   G        -> Energy Group of the particle
+  !!   isMG     -> True if particle uses MG data
+  !!   type     -> Physical Type of the particle (NEUTRON, PHOTON etc.)
+  !!   time     -> Position in time of the particle [s]
+  !!   matIdx   -> material Index in which particle is present
+  !!   cellIdx  -> Cell Index at the lowest level in which particle is present
+  !!   uniqueID -> Unique ID of the cell at the lowest level in which particle is present
+  !!   collisionN -> Number of collisions the particle went through
+  !!   broodID  -> ID of the source particle. It is used to indicate the primogenitor of the particles
+  !!               in the particleDungeon so they can be sorted, which is necessary for reproducibility
+  !!               with OpenMP
+  !!   curIFPGen -> Array of flag to set how many generations we should wait before starting to score importance
+  !!   wgtIFPGen -> Array of adjusted weights for importance scoring for each generations. Leftmost is scored when 
+  !!                all elements of curIFPGen are true, and the values are translated to the left afterward. Assumes
+  !!                branchless collisions without splitting are used, so that we don't need to sum the weights over
+  !!                neutrons sharing the same common ancestor.  
+  !!
+  !! Interface:
+  !!   assignemnt(=)  -> Build particleState from particle
+  !!   operator(.eq.) -> Return True if particle are exactly the same
+  !!   display        -> Print debug information about the state to the console
+  !!
   type, public :: particleState
     real(defReal)              :: wgt  = ZERO       ! Particle weight
     real(defReal),dimension(3) :: r    = ZERO       ! Global position
@@ -61,11 +115,18 @@ module particle_class
     integer(shortInt)          :: uniqueID = -1     ! Unique id at the lowest coord level
     integer(shortInt)          :: collisionN = 0    ! Number of collisions
     integer(shortInt)          :: broodID = 0       ! ID of the source particle
+    integer(shortInt)          :: ifpID = 0         ! ID for IFP estimator
+    integer(shortInt), dimension(10)       :: ifpAncestorsID = 0  ! list of n last IFP ancestors
+    real(defReal), dimension(10)           :: ifpAncestorWgt = ZERO
+    type(ancestorState), dimension(10)      :: ifpAncestorStates
+
+
   contains
-    generic    :: assignment(=)  => fromParticle
+    generic    :: assignment(=)  => fromParticle, fromAncestorState
     generic    :: operator(.eq.) => equal_particleState
     procedure  :: display        => display_particleState
     procedure  :: fromParticle   => particleState_fromParticle
+    procedure  :: fromAncestorState => particleState_fromAncestorState
     procedure  :: kill           => kill_particleState
 
     ! Private procedures
@@ -96,6 +157,8 @@ module particle_class
     integer(shortInt)          :: G         ! Particle Energy Group
     real(defReal)              :: w         ! Particle Weight
     real(defReal)              :: time      ! Particle time point
+    real(defReal), dimension(10)           :: ifpAncestorWgt
+    integer(shortInt), dimension(10)       :: ifpAncestorsID = 0  ! list of n last IFP ancestors
 
     ! Particle flags
     real(defReal)              :: w0             ! Particle initial weight (for implicit, variance reduction...)
@@ -106,6 +169,7 @@ module particle_class
     integer(shortInt)          :: type           ! Particle type
     integer(shortInt)          :: collisionN = 0 ! Index of the number of collisions the particle went through
     integer(shortInt)          :: broodID = 0    ! ID of the brood (source particle number)
+    integer(shortInt)          :: ifpID = 0      ! ID for IFP estimator
 
     ! Particle processing information
     class(RNG), pointer        :: pRNG  => null()  ! Pointer to RNG associated with the particle
@@ -118,6 +182,10 @@ module particle_class
     type(particleState)        :: preTransition
     type(particleState)        :: prePath
     type(particleState)        :: preCollision
+
+    ! Archived ancestors snapshots
+    type(ancestorState), dimension(10)           :: ifpAncestorStates
+
 
   contains
      ! Build procedures
@@ -194,6 +262,7 @@ contains
     self % E  = E
     self % w  = w
     self % w0 = w
+    self % ifpAncestorsID = 0
 
     self % isDead = .false.
     self % isMG   = .false.
@@ -236,6 +305,7 @@ contains
     self % G  = G
     self % w  = w
     self % w0 = w
+    self % ifpAncestorsID = 0
 
     self % isDead = .false.
     self % isMG   = .true.
@@ -274,6 +344,11 @@ contains
     LHS % collisionN            = RHS % collisionN
     LHS % splitCount            = 0 ! Reinitialise counter for number of splits
     LHS % broodID               = RHS % broodID
+    LHS % ifpID                 = RHS % ifpID
+    LHS % ifpAncestorsID        = RHS % ifpAncestorsID
+    LHS % ifpAncestorWgt        = RHS % ifpAncestorWgt
+    LHS % ifpAncestorStates     = RHS % ifpAncestorStates
+
 
   end subroutine particle_fromParticleState
 
@@ -653,6 +728,9 @@ contains
     LHS % isMG = RHS % isMG
     LHS % type = RHS % type
     LHS % time = RHS % time
+    LHS % ifpAncestorsID    = RHS % ifpAncestorsID
+    LHS % ifpAncestorWgt    = RHS % ifpAncestorWgt
+    LHS % ifpAncestorStates = RHS % ifpAncestorStates
 
     ! Save all indexes
     LHS % matIdx   = RHS % coords % matIdx
@@ -660,8 +738,35 @@ contains
     LHS % cellIdx  = RHS % coords % cell()
     LHS % collisionN = RHS % collisionN
     LHS % broodID    = RHS % broodID
+    LHS % ifpID      = RHS % ifpID
 
   end subroutine particleState_fromParticle
+
+  !!
+  !! Copy particle into phase coordinates of ancestor state
+  !!
+  subroutine particleState_fromAncestorState(LHS,RHS)
+    class(particleState), intent(out)  :: LHS
+    class(ancestorState), intent(in)        :: RHS
+
+    LHS % wgt  = RHS % wgt
+    LHS % r    = RHS % r
+    LHS % dir  = RHS % dir
+    LHS % E    = RHS % E
+    LHS % G    = RHS % G
+    LHS % isMG = RHS % isMG
+    LHS % type = RHS % type
+    LHS % time = RHS % time
+
+    ! Save all indexes
+    LHS % matIdx   = RHS % matIdx
+    LHS % uniqueID = RHS % uniqueId
+    LHS % cellIdx  = RHS % cellIdx
+    LHS % collisionN = RHS % collisionN
+    LHS % broodID    = RHS % broodID
+
+  end subroutine particleState_fromAncestorState
+
 
   !!
   !! Define equal operation on phase coordinates
@@ -684,6 +789,9 @@ contains
     isEqual = isEqual .and. LHS % uniqueID == RHS % uniqueID
     isEqual = isEqual .and. LHS % collisionN == RHS % collisionN
     isEqual = isEqual .and. LHS % broodID    == RHS % broodID
+    isEqual = isEqual .and. LHS % ifpID      == RHS % ifpID
+    isEqual = isEqual .and. all(LHS % ifpAncestorsID == RHS % ifpAncestorsID)
+    isEqual = isEqual .and. all(LHS % ifpAncestorWgt == RHS % ifpAncestorWgt)
 
     if( LHS % isMG ) then
       isEqual = isEqual .and. LHS % G == RHS % G
@@ -718,6 +826,57 @@ contains
     self % r    = ZERO
     self % dir  = ZERO
     self % E    = ZERO
+    self % ifpAncestorsID = 0
+    self % G    = 0
+    self % isMG = .false.
+    self % type = P_NEUTRON
+    self % time = ZERO
+    self % matIdx   = -1
+    self % cellIdx  = -1
+    self % uniqueID = -1
+    self % collisionN = 0
+    self % broodID    = 0
+    self % ifpID = 0
+
+  end subroutine kill_particleState
+
+  !!
+  !! Copy ancestor into phase coordinates
+  !!
+  subroutine ancestorState_fromParticleState(LHS,RHS)
+    class(ancestorState), intent(out)  :: LHS
+    class(particleState), intent(in)        :: RHS
+
+    LHS % wgt  = RHS % wgt
+    LHS % r    = RHS % r
+    LHS % dir  = RHS % dir
+    LHS % E    = RHS % E
+    LHS % G    = RHS % G
+    LHS % isMG = RHS % isMG
+    LHS % type = RHS % type
+    LHS % time = RHS % time
+    !LHS % ifpAncestorStates = RHS % ifpAncestorStates
+
+    ! Save all indexes
+    LHS % matIdx   = RHS % matIdx
+    LHS % uniqueID = RHS % uniqueId
+    LHS % cellIdx  = RHS % cellIdx
+    LHS % collisionN = RHS % collisionN
+    LHS % broodID    = RHS % broodID
+
+  end subroutine ancestorState_fromParticleState
+
+
+  !!
+  !! Return to uninitialised state
+  !!
+  elemental subroutine kill_ancestorState(self)
+    class(ancestorState), intent(inout) :: self
+
+    self % wgt  = ZERO
+    self % r    = ZERO
+    self % dir  = ZERO
+    self % E    = ZERO
     self % G    = 0
     self % isMG = .false.
     self % type = P_NEUTRON
@@ -728,8 +887,7 @@ contains
     self % collisionN = 0
     self % broodID    = 0
 
-  end subroutine kill_particleState
-
+  end subroutine kill_ancestorState
 
 !!<><><><><><><>><><><><><><><><><><><>><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 !! Misc Procedures

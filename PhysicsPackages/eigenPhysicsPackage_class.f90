@@ -232,13 +232,14 @@ contains
 
       ! Send end of cycle report
       Nend = self % nextCycle % popSize()
+      call self % nextCycle % sortByAncestorID()
       call tally % reportCycleEnd(self % nextCycle)
 
       if (self % UFS) then
         call self % ufsField % updateMap()
       end if
 
-      ! Normalise population
+      ! Normalise population and set IFP ID
       call self % nextCycle % normSize(self % pop, self % pRNG)
 
       if(self % printSource == 1) then

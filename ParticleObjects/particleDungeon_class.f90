@@ -62,6 +62,7 @@ module particleDungeon_class
     private
     real(defReal),public :: k_eff = ONE ! k-eff for fission site generation rate normalisation
     integer(shortInt)    :: pop = 0     ! Current population size of the dungeon
+    integer(shortInt)    :: IFP_gen = 0 ! Number of idle generations for IFP estimation
 
     ! Storage space
     type(particleState), dimension(:), allocatable, public :: prisoners
@@ -81,6 +82,7 @@ module particleDungeon_class
     generic    :: replace => replace_particle, replace_particleState
     procedure  :: copy
     procedure  :: get
+    procedure  :: getAncestor
 
     !! Misc Procedures
     procedure  :: isEmpty
@@ -92,6 +94,7 @@ module particleDungeon_class
     procedure  :: setSize
     procedure  :: printToFile
     procedure  :: sortByBroodID
+    procedure  :: sortByAncestorID
 
     ! Private procedures
     procedure, private :: detain_particle
@@ -108,14 +111,16 @@ contains
   !!
   !! Allocate space for the particles
   !!
-  subroutine init(self,maxSize)
+  subroutine init(self,maxSize,IFPGen)
     class(particleDungeon), intent(inout) :: self
     integer(shortInt), intent(in)         :: maxSize
+    integer(shortInt), intent(in), optional :: IFPGen
 
     if(allocated(self % prisoners)) deallocate(self % prisoners)
     allocate(self % prisoners(maxSize))
     self % pop    = 0
-
+    if(present(IFPGen)) self % IFP_gen = IFPGen
+    
   end subroutine init
 
   !!
@@ -378,6 +383,28 @@ contains
   end function get
 
   !!
+  !! Return ancestor particleState from a location inside the dungeon
+  !! Gives fatalError if requested index is 0, -ve or above current population
+  !!
+  function getAncestor(self, idx, ancestorIdx) result(state)
+    class(particleDungeon), intent(in) :: self
+    integer(shortInt), intent(in)      :: idx
+    integer(shortInt), intent(in)      :: ancestorIdx
+    type(particleState)                :: state
+    character(100), parameter :: Here = 'getAncestor (particleDungeon_class.f90)'
+
+    ! Protect against out-of-bounds access
+    if( idx <= 0 .or. idx > self % pop ) then
+      call fatalError(Here,'Out of bounds access with idx: '// numToChar(idx)// &
+                           ' with particle population of: '// numToChar(self % pop))
+    end if
+
+    ! Explicit copy. Will be changed soon
+    state = self % prisoners(idx) % ifpAncestorStates(ancestorIdx)
+
+  end function getAncestor
+
+  !!
   !! Returns .true. if dungeon is empty
   !!
   function isEmpty(self) result(isIt)
@@ -412,7 +439,7 @@ contains
     integer(shortInt), intent(in)         :: N
     class(RNG), intent(inout)             :: rand
     integer(shortInt)                     :: excessP, n_copies, n_duplicates
-    integer(shortInt)                     :: i, idx, maxBroodID
+    integer(shortInt)                     :: i, j, idx, maxBroodID, maxAncestorHistory
     integer(shortInt), dimension(:), allocatable :: duplicates
     character(100), parameter :: Here =' normSize (particleDungeon_class.f90)'
 
@@ -469,6 +496,19 @@ contains
       self % pop = N
 
     end if
+
+    ! Setting IFP IDs for current generation
+    do i = 1, self % pop
+      self % prisoners(i) % ifpID = i
+      ! Forgetting oldest generation and translating everything to the left
+      maxAncestorHistory = size(self % prisoners(i) % ifpAncestorsID)
+      if (all(self % prisoners(i) % ifpAncestorsID /= 0)) then
+        do j = 1, maxAncestorHistory - 1
+          self % prisoners(i) % ifpAncestorsID(j) = self % prisoners(i) % ifpAncestorsID(j+1) 
+        end do
+        self % prisoners(i) % ifpAncestorsID(maxAncestorHistory) = 0
+      end if
+    end do
 
   end subroutine normSize
 
@@ -533,6 +573,73 @@ contains
     end do
 
   end subroutine sortByBroodID
+
+   !!
+  !! Reorder the dungeon so the first IFP ancestor ID is in the ascending order
+  !!
+  !! Args:
+  !!   k [in] -> Maximum ancestor ID
+  !!
+  subroutine sortByAncestorID(self)
+    class(particleDungeon), intent(inout)        :: self
+    integer(shortInt)                            :: k
+    integer(shortInt), dimension(:), allocatable :: count
+    integer(shortInt)                            :: i, id, loc, c
+    integer(shortInt), dimension(:), allocatable :: perm
+    type(particleState)                          :: tmp
+    character(100), parameter :: Here = 'sortByAncestorID (particleDungeon_class.f90)'
+
+    ! Return if not enough generation have been reached for scoring importance
+    if (any(self % prisoners(1) % ifpAncestorsID == 0)) return
+    
+    k = maxval(self % prisoners(1:self % pop) % ifpAncestorsID(1))
+    allocate(count(k))
+    ! Count number of particles with each identical oldest ancestor ID
+    count = 0
+    do i = 1, self % pop
+      id = self % prisoners(i) % ifpAncestorsID(1)
+
+      if (id < 1 .or. id > k) call fatalError(Here, 'Ancestor ID out of range: '//numToChar(id))
+
+      count(id) = count(id) + 1
+    end do
+
+    ! Convert to starting index
+    loc = 1
+    do i = 1, k
+      c = count(i)
+      count(i) = loc
+      loc = loc + c
+    end do
+
+    ! Create the permutation array
+    allocate(perm(self % pop))
+    do i = 1, self % pop
+      id = self % prisoners(i) % ifpAncestorsID(1)
+      loc = count(id)
+      count(id) = count(id) + 1
+      perm(loc) = i
+    end do
+
+    ! Permute particles
+    do i = 1, self % pop
+      loc = perm(i)
+
+      ! If the element was already swapped follow it to its location
+      do while (loc < i)
+        loc = perm(loc)
+      end do
+
+      ! Swap elements
+      if (loc /= i) then
+        tmp = self % prisoners(i)
+        self % prisoners(i) = self % prisoners(loc)
+        self % prisoners(loc) = tmp
+      end if
+
+    end do
+
+  end subroutine sortByAncestorID
 
 
   !!

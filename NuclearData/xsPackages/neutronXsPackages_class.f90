@@ -64,6 +64,8 @@ module neutronXsPackages_class
     real(defReal) :: nuFission        = ZERO
   contains
     procedure :: invert => invert_microXSs
+    procedure :: invert_bl => invert_microXSs_bl
+
   end type neutronMicroXSs
 
 contains
@@ -279,6 +281,26 @@ contains
     end select
 
   end function invert_microXSs
+
+  elemental function invert_microXSs_bl(self, r) result(MT)
+  class(neutronMicroXSs), intent(in) :: self
+  real(defReal), intent(in) :: r
+  integer(shortInt) :: MT
+  real(defReal) :: E_eff
+
+
+  E_eff = r * (self % elasticScatter + self % inelasticScatter + self % nuFission)
+
+  if (E_eff < self % elasticScatter) then
+    MT = N_N_elastic
+  elseif (E_eff < self % elasticScatter + self % inelasticScatter) then
+    MT = N_N_inelastic
+  elseif (E_eff < self % elasticScatter + self % inelasticScatter + self % nuFission) then
+    MT = N_fission
+  else
+    MT = huge(0_shortInt)
+  end if
+end function invert_microXSs_bl
 
 
 end module neutronXsPackages_class
