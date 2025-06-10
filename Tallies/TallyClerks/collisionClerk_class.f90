@@ -213,41 +213,67 @@ contains
     real(defReal), intent(in)             :: muL   
     class(nuclearDatabase), intent(inout) :: xsData
     type(scoreMemory), intent(inout)      :: mem
-    type(particle)                       :: pTemp
-    integer(shortInt)                     :: binIdx, i
+    type(particleState)                   :: preColl, postColl
+    type(particle)                        :: preCollPart
+    integer(shortInt)                     :: inIdx, outIdx, i
     integer(longInt)                      :: adrr
-    real(defReal)                         :: scoreVal, flux
+    real(defReal)                         :: baseScore, score, flux
     character(100), parameter :: Here = 'reportOutColl (collisionClerk_class.f90)'
 
-    pTemp = p % preCollision
-    if (p % hasN2N) then 
+    preColl = p % preCollision
+    preCollPart = p % preCollision
+    postColl = p
+
+    select case(MT)
+      case(N_2N, N_2Na, N_2Nd, N_2Nf, N_2Np, N_2N2a, N_2Nl(1):N_2Nl(16))
+        baseScore = 2.0_defReal
+      case(N_3N, N_3Na, N_3Nf, N_3Np)
+        baseScore = 3.0_defReal
+      case(N_4N)
+        baseScore = 4.0_defReal
+      case default
+        baseScore = ONE
+    end select
+
+    ! Score in case of scattering events
+    select case(MT)
+      case ( N_N_ELASTIC, N_N_INELASTIC, N_N_ThermINEL, N_Nl(1):N_Nl(40), N_Ncont, &
+             N_2N, N_2Na, N_2Nd, N_2Nf, N_2Np, N_2N2a, N_2Nl(1):N_2Nl(16),  &
+             N_3N, N_3Na, N_3Nf, N_3Np, N_4N, N_Na, N_Np, N_Nd, N_Nt)
+
+      flux = preColl % wgt / xsData % getTotalMatXS(preCollPart, preCollPart % matIdx())
+
+      ! Check if within filter
+      if(allocated( self % filter)) then
+        if(self % filter % isFail(p % preCollision)) return
+      end if
+
+      ! Find bin index
+      if(allocated(self % map)) then
+        inIdx = self % map % map(preColl)
+        outIdx = self % map % map(postColl)
+      else
+        inIdx = 1
+        outIdx = 1
+      end if
+
+      ! Return if invalid bin index
+      if (inIdx == 0 .or. outIdx == 0) return
+
       do i = 1, self % width
         if (self % response(i) % MT() == N_2N) then
-
-          flux = pTemp % w / xsData % getTotalMatXS(pTemp, pTemp % matIdx())
-
-         ! Check if within filter
-          if(allocated( self % filter)) then
-            if(self % filter % isFail(p % preCollision)) return
-          end if
-
-          ! Find bin index
-          if(allocated(self % map)) then
-            binIdx = self % map % map(p % preCollision)
-          else
-            binIdx = 1
-          end if
-
-          ! Return if invalid bin index
-          if (binIdx == 0) return
-
           ! Calculate bin address
-          adrr = self % getMemAddress() + self % width * (binIdx -1)  - 1
-          scoreVal = self % response(i) % get(pTemp, xsData) * flux
-          call mem % score(scoreVal, adrr + i)
+          adrr = self % getMemAddress() + self % width * (inIdx -1) - 1
+          score = baseScore * self % response(i) % get(preCollPart, xsData) * flux
+        else if (self % response(i) % MT() == macroAllScatter) then
+          if (inIdx /= outIdx) then
+            adrr = self % getMemAddress() + self % width * (inIdx - 1) - 1
+            score = baseScore * self % response(i) % get(preCollPart, xsData) * flux
+          end if
         end if
+        call mem % score(score, adrr + i)
       end do
-    end if
+    end select
   end subroutine reportOutColl
   !!
   !! Process incoming collision report
@@ -302,6 +328,7 @@ contains
     ! Append all bins
     do i = 1,self % width
       if (self % response(i) % MT() == N_2N) cycle
+      if (self % response(i) % MT() == macroAllScatter) cycle
       scoreVal = self % response(i) % get(p, xsData) * flux
       call mem % score(scoreVal, adrr + i)
     end do
