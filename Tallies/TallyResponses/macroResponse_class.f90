@@ -87,7 +87,7 @@ contains
     ! Check that MT number is valid
     select case(MT)
     case(macroTotal, macroCapture, macroFission, macroNuFission, macroAbsorbtion, &
-         macroEscatter, macroIEscatter, macroPromptNuFission, macroDelayedNuFission, N_2N)
+         macroEscatter, macroIEscatter, macroPromptNuFission, macroDelayedNuFission, N_2N, macroAllScatter)
         ! Do nothing. MT is Valid
 
       case default
@@ -131,6 +131,8 @@ contains
 
     if (self % MT == N_2N) then 
       val = xss % get(macroIEscatter)
+    else if (self % MT == macroAllScatter) then
+      val = xss % get(macroEscatter) + xss % get(macroIEscatter)
     else
       val = xss % get(self % MT)
     end if
