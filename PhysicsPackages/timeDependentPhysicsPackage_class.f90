@@ -444,6 +444,11 @@ contains
     name = 'Time_bins'
     call out % printValue(self % N_timeBins, name)
 
+    name = 'Poisson_source'
+    if (allocated(self % poissonSource)) then
+      call out % printValue(self % poissonSource % poissonIntensity, name)
+    end if
+
     call cpu_time(self % CPU_time_end)
     name = 'Total_CPU_Time'
     call out % printValue((self % CPU_time_end-self % CPU_time_start), name)

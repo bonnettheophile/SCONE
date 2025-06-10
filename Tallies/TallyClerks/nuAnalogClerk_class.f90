@@ -194,7 +194,7 @@ contains
 
       ! Score nu
       call mem % score(newScore, addr + NU_FISS)
-      if (.not. self % delayed .and. pNew % type == P_NEUTRON) call mem % score(newScore, addr + TMP)
+      if (.not. self % delayed) call mem % score(newScore, addr + TMP)
 
     end if
   end if
@@ -239,7 +239,7 @@ contains
 
       call mem % score(ONE, addr + EVENT)
       call mem % getBin(nu, addr + TMP)
-      call mem % score(nu*nu, addr + NU2_FISS)
+      call mem % score((nu-1)*(nu-1), addr + NU2_FISS)
       call mem % setBin(ZERO, addr + TMP)
     end if
 

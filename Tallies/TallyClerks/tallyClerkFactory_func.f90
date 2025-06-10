@@ -23,6 +23,7 @@ module tallyClerkFactory_func
   use nuAnalogClerk_class,             only : nuAnalogClerk
   use lambdaAnalogClerk_class,         only : lambdaAnalogClerk
   use lifetimeClerk_class,             only : lifetimeClerk
+  use leakRateClerk_class,             only : leakRateClerk
 
   implicit none
   private
@@ -47,7 +48,8 @@ module tallyClerkFactory_func
                                                                         'hittingProbClerk         ',&
                                                                         'nuAnalogClerk            ',&
                                                                         'lambdaAnalogClerk        ',&
-                                                                        'lifetimeClerk            ']
+                                                                        'lifetimeClerk            ',&
+                                                                        'leakRateClerk            ']
 
 contains
 
@@ -114,6 +116,9 @@ contains
 
      case('lifetimeClerk')
        allocate(lifetimeClerk :: new)
+      
+     case('leakRateClerk')
+       allocate(leakRateClerk :: new)
 
      case default
        print *, AVALIBLE_tallyClerks

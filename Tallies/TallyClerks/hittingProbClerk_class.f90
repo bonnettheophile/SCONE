@@ -29,6 +29,9 @@ module hittingProbClerk_class
   ! Nuclear Data Interface
   use nuclearDataReg_mod,     only : ndReg_get => get
   implicit none
+
+  integer(shortInt), parameter, public :: UPPER = 1, LOWER = 2
+
   private
 
   !!
@@ -67,6 +70,7 @@ module hittingProbClerk_class
     real(defReal), dimension(:), allocatable         :: hittingTimesNeutron
     real(defReal), dimension(:), allocatable         :: currentNeutronPops
     integer(shortInt)                                :: cycles
+    integer(shortInt)                                :: thresholdKind
     type(particleDungeon), allocatable               :: neutrons
 
     ! Useful data
@@ -104,6 +108,7 @@ contains
     integer(shortInt)                           :: i, j
     class(dictionary), pointer                  :: responseDict
     character(nameLen)                          :: type
+    character(100), parameter :: Here = 'init (hittingProbClerk_class.f90)'
 
     ! Assign name
     call self % setName(name)
@@ -121,11 +126,22 @@ contains
     ! Get max time to consider
     call dict % get(self % maxT,'maxT')
 
+    ! Get if its a lower bound or upper bound
+    call dict % getOrDefault(type, 'kind', 'upper')
     ! Get population max threshold
-    call dict % get(self % maxPop,'maxPop')
-
+    if (trim(type) == 'upper') then
+      self % thresholdKind = UPPER
+      call dict % get(self % maxPop,'maxPop')
     ! Get population min threshold
-    call dict % get(self % minPop, 'minPop')
+    else if (trim(type) == 'lower') then
+      self % thresholdKind = LOWER
+      call dict % get(self % minPop, 'minPop')
+    else
+      call fatalError(Here, 'Invalid input for threshold kind')
+    end if
+    
+
+
 
     ! Get population threshold
     call dict % get(self % cycles,'cycles')
@@ -143,7 +159,7 @@ contains
 
       if (type == "neutronResponse") then
         allocate(self % neutrons)
-        call self % neutrons % init(20 * self % maxPop)
+        call self % neutrons % init(20)
         allocate(self % currentNeutronPops(self % cycles))
         allocate(self % firstHitsNeutron(self % cycles))
         allocate(self % hittingTimesNeutron(self % cycles))
@@ -355,12 +371,12 @@ contains
       adrr = self % getMemAddress() + self % width * (i - 1) - 1
       accScore = mem % getScore(adrr)
       self % currentNeutronPops(batchIdx) = accScore
-      if (self % currentNeutronPops(batchIdx) >= self % maxPop) then
+      if (self % currentNeutronPops(batchIdx) >= self % maxPop .and. self % thresholdKind == UPPER) then
         self % firstHitsNeutron(batchIdx) = .false.
         self % hittingTimesNeutron(batchIdx) = i
-      !else if (self % currentNeutronPops(batchIdx) == self % minPop) then
-      !  self % firstHitsNeutron(batchIdx) = .false.
-      !  self % hittingTimesNeutron(batchIdx) = i
+      else if (self % currentNeutronPops(batchIdx) <= self % minPop .and. self % thresholdKind == LOWER) then
+        self % firstHitsNeutron(batchIdx) = .false.
+        self % hittingTimesNeutron(batchIdx) = i
       end if
 
     end do
