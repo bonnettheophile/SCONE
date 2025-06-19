@@ -45,7 +45,7 @@ module collisionClerk_class
   !! SAMPLE DICTIOANRY INPUT:
   !!
   !! myCollisionClerk {
-  !!   type collisionClerk;
+  !!   type collisionClerk; 
   !!   # filter { <tallyFilter definition> } #
   !!   # map    { <tallyMap definition>    } #
   !!   response (resName1 #resName2 ... #)
@@ -53,16 +53,16 @@ module collisionClerk_class
   !!   #resNamew { <tallyResponse definition #
   !! }
   !!
-  type, public, extends(tallyClerk) :: collisionClerk
+  type, public, extends(tallyClerk):: collisionClerk
     private
     ! Filter, Map & Vector of Responses
     class(tallyFilter), allocatable                  :: filter
     class(tallyMap), allocatable                     :: map
-    type(tallyResponseSlot),dimension(:),allocatable :: response
+    type(tallyResponseSlot), dimension(:), allocatable:: response
 
     ! Useful data
     logical(defBool)   :: normByPop = .false.
-    real(defReal)      :: invPopSize = ONE ! 1 so that without normalization it behaves as usual
+    real(defReal)      :: invPopSize = ONE  ! 1 so that without normalization it behaves as usual
     integer(shortInt)  :: width = 0
     logical(defBool)   :: virtual = .false.
 
@@ -95,7 +95,7 @@ contains
     class(collisionClerk), intent(inout)        :: self
     class(dictionary), intent(in)               :: dict
     character(nameLen), intent(in)              :: name
-    character(nameLen),dimension(:),allocatable :: responseNames
+    character(nameLen), dimension(:), allocatable:: responseNames
     integer(shortInt)                           :: i
 
     ! Assign name
@@ -112,11 +112,11 @@ contains
     end if
 
     ! Get names of response dictionaries
-    call dict % get(responseNames,'response')
+    call dict % get(responseNames, 'response')
 
     ! Load responses
     allocate(self % response(size(responseNames)))
-    do i=1, size(responseNames)
+    do i = 1, size(responseNames)
       call self % response(i) % init(dict % getDictPtr( responseNames(i) ))
     end do
 
@@ -130,14 +130,14 @@ contains
     self % width = size(responseNames)
 
     ! Handle virtual collisions
-    call dict % getOrDefault(self % virtual,'handleVirtual', .false.)
+    call dict % getOrDefault(self % virtual, 'handleVirtual', .false.)
   end subroutine init
 
   !!
   !! Return to uninitialised state
   !!
   elemental subroutine kill(self)
-    class(collisioNClerk), intent(inout) :: self
+    class(collisioNClerk), intent(inout):: self
 
     ! Superclass
     call kill_super(self)
@@ -169,8 +169,8 @@ contains
   !! See tallyClerk_inter for details
   !!
   function validReports(self) result(validCodes)
-    class(collisionClerk),intent(in)           :: self
-    integer(shortInt),dimension(:),allocatable :: validCodes
+    class(collisionClerk), intent(in)           :: self
+    integer(shortInt), dimension(:), allocatable:: validCodes
 
     validCodes = [cycleStart_CODE, inColl_CODE, outColl_CODE]
 
@@ -182,11 +182,11 @@ contains
   !! See tallyClerk_inter for details
   !!
   elemental function getSize(self) result(S)
-    class(collisionClerk), intent(in) :: self
+    class(collisionClerk), intent(in):: self
     integer(shortInt)                 :: S
 
     S = size(self % response)
-    if (allocated(self % map)) S = S * self % map % bins(0)
+    if (allocated(self % map)) S = S*self % map % bins(0)
 
   end function getSize
 
@@ -211,14 +211,14 @@ contains
     class(particle), intent(in)           :: p
     integer(shortInt), intent(in)         :: MT
     real(defReal), intent(in)             :: muL   
-    class(nuclearDatabase), intent(inout) :: xsData
+    class(nuclearDatabase), intent(inout):: xsData
     type(scoreMemory), intent(inout)      :: mem
     type(particleState)                   :: preColl, postColl
     type(particle)                        :: preCollPart
     integer(shortInt)                     :: inIdx, outIdx, i
     integer(longInt)                      :: adrr
     real(defReal)                         :: baseScore, score, flux
-    character(100), parameter :: Here = 'reportOutColl (collisionClerk_class.f90)'
+    character(100), parameter:: Here = 'reportOutColl (collisionClerk_class.f90)'
 
     preColl = p % preCollision
     preCollPart = p % preCollision
@@ -241,7 +241,7 @@ contains
              N_2N, N_2Na, N_2Nd, N_2Nf, N_2Np, N_2N2a, N_2Nl(1):N_2Nl(16),  &
              N_3N, N_3Na, N_3Nf, N_3Np, N_4N, N_Na, N_Np, N_Nd, N_Nt)
 
-      flux = preColl % wgt / xsData % getTotalMatXS(preCollPart, preCollPart % matIdx())
+      flux = preColl % wgt/xsData % getTotalMatXS(preCollPart, preCollPart % matIdx())
 
       ! Check if within filter
       if(allocated( self % filter)) then
@@ -261,17 +261,16 @@ contains
       if (inIdx == 0 .or. outIdx == 0) return
 
       do i = 1, self % width
+        adrr = self % getMemAddress() + self % width * (inIdx-1) - 1
         if (self % response(i) % MT() == N_2N) then
           ! Calculate bin address
-          adrr = self % getMemAddress() + self % width * (inIdx -1) - 1
-          score = baseScore * self % response(i) % get(preCollPart, xsData) * flux
+          score = baseScore*self % response(i) % get(preCollPart, xsData) * flux
         else if (self % response(i) % MT() == macroAllScatter) then
           if (inIdx /= outIdx) then
-            adrr = self % getMemAddress() + self % width * (inIdx - 1) - 1
-            score = baseScore * self % response(i) % get(preCollPart, xsData) * flux
+            score = baseScore*self % response(i) % get(preCollPart, xsData) * flux
           end if
         end if
-        call mem % score(score, adrr + i)
+        call mem % score(score, adrr+i)
       end do
     end select
   end subroutine reportOutColl
@@ -283,27 +282,27 @@ contains
   subroutine reportInColl(self, p, xsData, mem, virtual)
     class(collisionClerk), intent(inout)  :: self
     class(particle), intent(in)           :: p
-    class(nuclearDatabase), intent(inout) :: xsData
+    class(nuclearDatabase), intent(inout):: xsData
     type(scoreMemory), intent(inout)      :: mem
     logical(defBool), intent(in)          :: virtual
     type(particleState)                   :: state
     integer(shortInt)                     :: binIdx, i
     integer(longInt)                      :: adrr
     real(defReal)                         :: scoreVal, flux
-    character(100), parameter :: Here = 'reportInColl (collisionClerk_class.f90)'
+    character(100), parameter:: Here = 'reportInColl (collisionClerk_class.f90)'
 
     ! Return if collision is virtual but virtual collision handling is off
     if (self % virtual) then
       ! Retrieve tracking cross section from cache
-      flux = p % w / xsData % getTrackingXS(p, p % matIdx(), TRACKING_XS)
+      flux = p % w/xsData % getTrackingXS(p, p % matIdx(), TRACKING_XS)
     else
       if (virtual) return
-      flux = p % w / xsData % getTotalMatXS(p, p % matIdx())
+      flux = p % w/xsData % getTotalMatXS(p, p % matIdx())
     end if
 
     ! Normalize by number of particles at start of timebin
     if (self % normByPop) then
-      flux = flux * self %  invPopSize
+      flux = flux*self %  invPopSize
     end if
     ! Get current particle state
     state = p
@@ -323,14 +322,14 @@ contains
     if (binIdx == 0) return
 
     ! Calculate bin address
-    adrr = self % getMemAddress() + self % width * (binIdx -1)  - 1
+    adrr = self % getMemAddress() + self % width * (binIdx-1)  - 1
 
     ! Append all bins
-    do i = 1,self % width
+    do i = 1, self % width
       if (self % response(i) % MT() == N_2N) cycle
       if (self % response(i) % MT() == macroAllScatter) cycle
       scoreVal = self % response(i) % get(p, xsData) * flux
-      call mem % score(scoreVal, adrr + i)
+      call mem % score(scoreVal, adrr+i)
     end do
 
   end subroutine reportInColl
@@ -359,7 +358,7 @@ contains
     type(scoreMemory), intent(in)              :: mem
     real(defReal)                              :: val, std
     integer(shortInt)                          :: i
-    integer(shortInt),dimension(:),allocatable :: resArrayShape
+    integer(shortInt), dimension(:), allocatable:: resArrayShape
     character(nameLen)                         :: name
 
     ! Begin block
@@ -383,8 +382,8 @@ contains
     call outFile % startArray(name, resArrayShape)
 
     ! Print results to the file
-    do i=1,product(resArrayShape)
-      call mem % getResult(val, std, self % getMemAddress() - 1 + i)
+    do i = 1, product(resArrayShape)
+      call mem % getResult(val, std, self % getMemAddress() - 1+i)
       call outFile % addResult(val, std)
     end do
 
