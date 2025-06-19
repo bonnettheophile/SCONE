@@ -270,8 +270,8 @@ contains
           if (inIdx /= outIdx) then
             adrr = self % getMemAddress() + self % width * (inIdx -1) - 1
             score = baseScore*self % response(i) % get(preCollPart, xsData) * flux
+            call mem % score(score, adrr+i)
           end if
-          call mem % score(score, adrr+i)
         end if
       end do
     end select
