@@ -261,16 +261,18 @@ contains
       if (inIdx == 0 .or. outIdx == 0) return
 
       do i = 1, self % width
-        adrr = self % getMemAddress() + self % width * (inIdx-1) - 1
         if (self % response(i) % MT() == N_2N) then
           ! Calculate bin address
+          adrr = self % getMemAddress() + self % width * (inIdx -1) - 1
           score = baseScore*self % response(i) % get(preCollPart, xsData) * flux
+          call mem % score(score, adrr+i)
         else if (self % response(i) % MT() == macroAllScatter) then
           if (inIdx /= outIdx) then
+            adrr = self % getMemAddress() + self % width * (inIdx -1) - 1
             score = baseScore*self % response(i) % get(preCollPart, xsData) * flux
           end if
+          call mem % score(score, adrr+i)
         end if
-        call mem % score(score, adrr+i)
       end do
     end select
   end subroutine reportOutColl
