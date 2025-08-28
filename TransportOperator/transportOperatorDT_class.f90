@@ -72,7 +72,7 @@ contains
     character(100), parameter:: Here = 'deltaTracking (transportOIperatorDT_class.f90)'
     character(100):: scale
 !   Data definitions for virtual density module  !
-    real(defReal), dimension(3)                :: cosines, virtual_cosines, real_vector, virtual_vector
+    real(defReal), dimension(3)                :: cosines, virtual_cosines, real_vector, virtual_vector, preCosines
     real(defReal)                             :: virtual_dist, flight_stretch_factor
 
 !   Data definitions for virtual density end here!
@@ -80,13 +80,14 @@ contains
     ! Get majorat XS inverse: 1/Sigma_majorant
     majorant_inv = ONE/self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS)
     scale = trim(self % scale_type)
+    preCosines = p % dirGlobal()
 
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
     DTLoop:do
       distance = -log( p % pRNG % get() ) * majorant_inv*self % product_factor
       if (self % virtual_density) then
-        cosines(:) = p % dirGlobal()
+        cosines(:) = preCosines
         real_vector = distance*cosines
 
         if (self % deform_type == 'swelling') then
@@ -113,7 +114,7 @@ contains
     ! Move partice in the geometry
 
       call self % geom % teleport(p % coords, distance)         
-
+      call p % point(preCosines)
       ! If particle has leaked exit
       if (p % matIdx() == OUTSIDE_FILL) then
         p % fate = LEAK_FATE
