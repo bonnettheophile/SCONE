@@ -85,7 +85,7 @@ contains
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
     DTLoop:do
-      distance = -log( p % pRNG % get() ) * majorant_inv*self % product_factor
+      distance = -log( p % pRNG % get() ) * majorant_inv
       if (self % virtual_density) then
         cosines(:) = preCosines
         real_vector = distance*cosines
