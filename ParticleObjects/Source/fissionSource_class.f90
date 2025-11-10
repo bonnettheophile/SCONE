@@ -88,7 +88,12 @@ contains
     self % geom => geom
 
     ! Get parameter for virtual density coefficient generation
-    call dict % get(temp, 'eps')
+    if (dict % isPresent('eps')) then
+      call dict % get(temp, 'eps')
+    else
+      allocate(temp(4))
+      temp = ZERO
+    end if
     self % eps = temp
 
     call dict % getOrDefault(type, 'gpcPert', 'none')

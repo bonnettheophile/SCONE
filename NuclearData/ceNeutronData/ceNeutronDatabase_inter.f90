@@ -392,6 +392,7 @@ contains
 
     ! Check Cache and update if needed
     if (materialCache(matIdx) % E_tot /= p % E) call self % updateTotalMatXS(p % E, matIdx, p % pRNG)
+    !call self % updateTotalMatXS(p % E, matIdx, p % pRNG)
 
     ! Return Cross-Section
     xs = materialCache(matIdx) % xss % total

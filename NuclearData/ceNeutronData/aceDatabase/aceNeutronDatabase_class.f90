@@ -534,7 +534,11 @@ contains
         ! When TMS is in use, the xss are retrieved sampling the nuclides' relative
         ! energies given the temperature difference between material temperature and
         ! temperature of the nuclides' base cross sections
-        call self % updateRelEnMacroXSs(E, matIdx, rand)
+        if (present(f)) then
+          call self % updateRelEnMacroXSs(E, matIdx, rand, f)
+        else
+          call self % updateRelEnMacroXSs(E, matIdx, rand)
+        end if
 
       else
 
