@@ -367,7 +367,7 @@ contains
   subroutine elastic(self, p, tally, collDat, thisCycle, nextCycle)
     class(neutronCEbls), intent(inout)     :: self
     class(particle), intent(inout)         :: p
-    type(tallyAdmin), intent(inout)      :: tally
+    type(tallyAdmin), intent(inout)        :: tally
     type(collisionData), intent(inout)     :: collDat
     class(particleDungeon),intent(inout)   :: thisCycle
     class(particleDungeon),intent(inout)   :: nextCycle

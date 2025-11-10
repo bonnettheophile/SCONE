@@ -307,7 +307,6 @@ contains
 
     dens   = self % dens(i)
     nucIdx = self % nuclides(i)
-    if (trim(self % name) == 'water') print *, "bruh water"
 
     if (self % gpcMap % length() /= 0) then
       if ((self % gpcMap % getOrDefault(nucIdx, NOT_FOUND) /= NOT_FOUND)) then 
@@ -361,7 +360,11 @@ contains
 
     ! Get material tracking XS
     if (E /= materialCache(self % matIdx) % E_track) then
-      call self % data % updateTrackMatXS(E, self % matIdx, rand)
+      if (present(f)) then
+        call self % data % updateTrackMatXS(E, self % matIdx, rand, f)
+      else 
+        call self % data % updateTrackMatXS(E, self % matIdx, rand)
+      end if
     end if
 
     trackMatXS = materialCache(self % matIdx) % trackXS * rand % get()

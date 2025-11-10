@@ -358,13 +358,13 @@ contains
     end if
 
     ! Check Cache and update if needed
-    if (materialCache(matIdx) % E_track /= p % E) then 
+    !if (materialCache(matIdx) % E_track /= p % E) then 
       if (present(f)) then 
         call self % updateTrackMatXS(p % E, matIdx, p % pRNG, f)
       else 
         call self % updateTrackMatXS(p % E, matIdx, p % pRNG)
       end if
-    end if
+    !end if
     ! Return Cross-Section
     xs = materialCache(matIdx) % trackXS
 
@@ -391,8 +391,8 @@ contains
     end if
 
     ! Check Cache and update if needed
-    if (materialCache(matIdx) % E_tot /= p % E) call self % updateTotalMatXS(p % E, matIdx, p % pRNG)
-    !call self % updateTotalMatXS(p % E, matIdx, p % pRNG)
+    !if (materialCache(matIdx) % E_tot /= p % E) call self % updateTotalMatXS(p % E, matIdx, p % pRNG)
+    call self % updateTotalMatXS(p % E, matIdx, p % pRNG)
 
     ! Return Cross-Section
     xs = materialCache(matIdx) % xss % total
