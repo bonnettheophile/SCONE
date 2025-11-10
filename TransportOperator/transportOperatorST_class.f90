@@ -74,7 +74,7 @@ contains
         dist = INFINITY
 
       else
-        sigmaT = self % xsData % getTrackingXS(p, p % matIdx(), MATERIAL_XS)
+        sigmaT = self % xsData % getTrackingXS(p, p % matIdx(), MATERIAL_XS, p % f(4))
         dist = -log( p % pRNG % get()) / sigmaT
 
         ! Should never happen  ! Catches NaN distances
@@ -113,10 +113,10 @@ contains
             virtual_cosines(3) = cosines(3) * p % f(1) * &
                 p % f(2) / flight_stretch_factor
           elseif (self % deform_type(current_mat) == 'expansion') then
-            virtual_vector = real_vector/p % f
+            virtual_vector = real_vector/p % f(:3)
             virtual_dist = sqrt(sum(virtual_vector**2))
             flight_stretch_factor = virtual_dist/dist
-            virtual_cosines = cosines / (p % f*flight_stretch_factor)
+            virtual_cosines = cosines / (p % f(:3)*flight_stretch_factor)
           else
             call fatalError(Here, 'Unrecognised geometric deformation')
           end if

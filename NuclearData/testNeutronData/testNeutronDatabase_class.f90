@@ -168,11 +168,12 @@ contains
   !!
   !! See nuclearDatabase_inter for details
   !!
-  function getTrackingXS(self, p, matIdx, what) result(xs)
+  function getTrackingXS(self, p, matIdx, what, f) result(xs)
     class(testNeutronDatabase), intent(inout) :: self
     class(particle), intent(in)               :: p
     integer(shortInt), intent(in)             :: matIdx
     integer(shortInt), intent(in)             :: what
+    real(defReal), optional, intent(in)         :: f
     real(defReal)                             :: xs
 
     xs = self % xsVal
@@ -184,10 +185,11 @@ contains
   !!
   !! See nuclearDatabase_inter for details
   !!
-  function getTrackMatXS(self, p, matIdx) result(xs)
+  function getTrackMatXS(self, p, matIdx, f) result(xs)
     class(testNeutronDatabase), intent(inout) :: self
     class(particle), intent(in)               :: p
     integer(shortInt), intent(in)             :: matIdx
+    real(defReal), optional, intent(in)         :: f
     real(defReal)                             :: xs
 
     xs = self % xsVal

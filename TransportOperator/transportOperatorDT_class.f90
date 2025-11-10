@@ -100,10 +100,10 @@ contains
           virtual_cosines(2) = cosines(2) * p % f(1) * p % f(3) / flight_stretch_factor
           virtual_cosines(3) = cosines(3) * p % f(1) * p % f(2) / flight_stretch_factor
         elseif (self % deform_type == 'expansion') then
-          virtual_vector = real_vector / p % f
+          virtual_vector = real_vector / p % f(:3)
           virtual_dist = sqrt(sum(virtual_vector**2))
           flight_stretch_factor = virtual_dist/distance
-          virtual_cosines = cosines / (p % f*flight_stretch_factor)
+          virtual_cosines = cosines / (p % f(:3)*flight_stretch_factor)
         else
           print *,'Error in recognizing type of geometric deformation! Please check input!'
         end if

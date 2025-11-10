@@ -21,7 +21,8 @@ module aceNeutronDatabase_class
 
   ! Material Menu
   use materialMenu_mod,             only : materialItem, nuclideInfo, mm_nMat => nMat, &
-                                           mm_getMatPtr => getMatPtr, mm_nameMap => nameMap
+                                           mm_getMatPtr => getMatPtr, mm_nameMap => nameMap, &
+                                           mm_matIdx => matIdx
 
   ! ACE CE Nuclear Data Objects
   use aceLibrary_mod,               only : new_neutronAce, new_moderACE, aceLib_load => load, aceLib_kill => kill
@@ -309,12 +310,13 @@ contains
   !!
   !! See ceNeutronDatabase for more details
   !!
-  subroutine updateMajorantXS(self, E, rand)
+  subroutine updateMajorantXS(self, E, rand, f)
     class(aceNeutronDatabase), intent(in) :: self
     real(defReal), intent(in)             :: E
     class(RNG), optional, intent(inout)   :: rand
+    real(defReal), optional, intent(in)   :: f
     integer(shortInt)                     :: idx, i, matIdx
-    real(defReal)                         :: f
+    real(defReal)                         :: frac
     character(100), parameter :: Here = 'updateMajorantXS (aceNeutronDatabase_class.f90)'
 
     associate (maj => cache_majorantCache(1))
@@ -331,10 +333,10 @@ contains
         end if
 
         associate (E_top => self % eGridUnion(idx + 1), E_low  => self % eGridUnion(idx))
-          f = (E - E_low) / (E_top - E_low)
+          frac = (E - E_low) / (E_top - E_low)
         end associate
 
-        maj % xs = self % majorant(idx+1) * f + (ONE - f) * self % majorant(idx)
+        maj % xs = self % majorant(idx+1) * frac + (ONE - frac) * self % majorant(idx)
 
       else ! Compute majorant on the fly
 
@@ -346,7 +348,11 @@ contains
 
           ! Update if needed
           if (cache_materialCache(matIdx) % E_track /= E) then
-            call self % updateTrackMatXS(E, matIdx, rand)
+            if (present(f)) then 
+              call self % updateTrackMatXS(E, matIdx, rand, f)
+            else
+              call self % updateTrackMatXS(E, matIdx, rand)
+            end if
           end if
 
           maj % xs = max(maj % xs, cache_materialCache(matIdx) % trackXS)
@@ -364,11 +370,13 @@ contains
   !!
   !! See ceNeutronDatabase for more details
   !!
-  subroutine updateTrackMatXS(self, E, matIdx, rand)
+  subroutine updateTrackMatXS(self, E, matIdx, rand, f)
     class(aceNeutronDatabase), intent(in) :: self
     real(defReal), intent(in)             :: E
     integer(shortInt), intent(in)         :: matIdx
     class(RNG), optional, intent(inout)   :: rand
+    real(defReal), optional, intent(in)  :: f
+
 
     associate (matCache => cache_materialCache(matIdx), &
                mat      => self % materials(matIdx))
@@ -378,11 +386,18 @@ contains
 
       if (mat % useTMS(E)) then
         ! The material tracking xs is the temperature majorant in the case of TMS
-        call self % updateTotalTempMajXS(E, matIdx)
-
+        if (present(f)) then
+          call self % updateTotalTempMajXS(E, matIdx, f)
+        else
+          call self % updateTotalTempMajXS(E, matIdx)
+        end if
       else
         ! When TMS is not in use, the material tracking xs is equivalent to the total
-        call self % updateTotalMatXS(E, matIdx, rand)
+        if (present(f)) then
+          call self % updateTotalMatXS(E, matIdx, rand, f)
+        else
+          call self % updateTotalMatXS(E, matIdx, rand)
+        end if
         matCache % trackXS = matCache % xss % total
 
       end if
@@ -402,10 +417,11 @@ contains
   !!   E [in]         -> Incident neutron energy for which temperature majorant is found
   !!   matIdx [in]    -> Index of material for which the material temperature majorant is found
   !!
-  subroutine updateTotalTempMajXS(self, E, matIdx)
+  subroutine updateTotalTempMajXS(self, E, matIdx, f)
     class(aceNeutronDatabase), intent(in) :: self
     real(defReal), intent(in)             :: E
     integer(shortInt), intent(in)         :: matIdx
+    real(defReal), intent(in), optional   :: f
     integer(shortInt)                     :: nucIdx, i
     real(defReal)                         :: dens, corrFact, nucTempMaj
 
@@ -420,7 +436,11 @@ contains
 
         ! Get nuclide data
         nucIdx  = mat % nuclides(i)
-        dens    = mat % dens(i)
+        if (present(f)) then
+          dens  = mat % getNuclideDensity(i,f)
+        else
+          dens    = mat % getNuclideDensity(i)
+        end if
 
         call self % updateTotalTempNucXS(E, mat % kT, nucIdx)
 
@@ -441,11 +461,12 @@ contains
   !!
   !! See ceNeutronDatabase for more details
   !!
-  subroutine updateTotalMatXS(self, E, matIdx, rand)
+  subroutine updateTotalMatXS(self, E, matIdx, rand, f)
     class(aceNeutronDatabase), intent(in) :: self
     real(defReal), intent(in)             :: E
     integer(shortInt), intent(in)         :: matIdx
     class(RNG), optional, intent(inout)   :: rand
+    real(defReal), intent(in), optional   :: f
     integer(shortInt)                     :: i, nucIdx
     real(defReal)                         :: dens
 
@@ -465,7 +486,11 @@ contains
       else
         ! Construct total macro XS
         do i = 1, size(mat % nuclides)
-          dens   = mat % dens(i)
+          if (present(f)) then 
+            dens   = mat % getNuclideDensity(i,f)
+          else
+            dens   = mat % getNuclideDensity(i)
+          end if
           nucIdx = mat % nuclides(i)
 
           ! Update if needed
@@ -490,11 +515,12 @@ contains
   !!
   !! See ceNeutronDatabase for more details
   !!
-  subroutine updateMacroXSs(self, E, matIdx, rand)
+  subroutine updateMacroXSs(self, E, matIdx, rand, f)
     class(aceNeutronDatabase), intent(in) :: self
     real(defReal), intent(in)             :: E
     integer(shortInt), intent(in)         :: matIdx
     class(RNG), optional, intent(inout)   :: rand
+    real(defReal), intent(in), optional   :: f
     integer(shortInt)                     :: i, nucIdx
     real(defReal)                         :: dens
 
@@ -518,7 +544,11 @@ contains
 
         ! Construct microscopic XSs
         do i = 1, size(mat % nuclides)
-          dens   = mat % dens(i)
+          if (present(f)) then
+            dens   = mat % getNuclideDensity(i,f)
+          else
+            dens   = mat % getNuclideDensity(i)
+          end if
           nucIdx = mat % nuclides(i)
 
           ! Update if needed
@@ -545,11 +575,12 @@ contains
   !!   E [in]         -> Incident neutron energy for which the relative energy xss are found
   !!   matIdx [in]    -> Index of material for which the relative energy xss are found
   !!
-  subroutine updateRelEnMacroXSs(self, E, matIdx, rand)
+  subroutine updateRelEnMacroXSs(self, E, matIdx, rand, f)
     class(aceNeutronDatabase), intent(in) :: self
     real(defReal), intent(in)             :: E
     integer(shortInt), intent(in)         :: matIdx
     class(RNG), optional, intent(inout)   :: rand
+    real(defReal), intent(in), optional   :: f
     integer(shortInt)                     :: i, nucIdx
     real(defReal)                         :: dens, nuckT, A, deltakT, eRel, eMin, &
                                              eMax, doppCorr
@@ -568,7 +599,11 @@ contains
         ! Construct microscopic XSs
         do i = 1, size(mat % nuclides)
 
-          dens   = mat % dens(i)
+          if (present(f)) then
+            dens = mat % getNuclideDensity(i,f)
+          else
+            dens   = mat % getNuclideDensity(i)
+          end if
           nucIdx = mat % nuclides(i)
           nuckT  = self % nuclides(nucIdx) % getkT()
           A      = self % nuclides(nucIdx) % getMass()
@@ -950,9 +985,15 @@ contains
                 'K and '//numToChar(sabT(2) * joulesPerMeV / kBoltzmann)//'K.')
         end if
 
+        ! Save info related to gpc eigenvalue
+        if (mat % nuclides(j) % hasGPC) then
+          call self % materials(i) % gpcMap % add(nucIdxs(j), mm_matIdx(mat % nuclides(j) % gpcMat))
+        end if  
       end do
 
-      ! Load data into material
+      
+
+        ! Load data into material
       call self % materials(i) % set( name     = mat % name,     &
                                       matIdx   = i,              &
                                       database = ptr_ceDatabase, &

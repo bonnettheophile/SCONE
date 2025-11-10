@@ -106,12 +106,13 @@ module ceNeutronDatabase_inter
     !!   matIdx [in]  -> material index that needs to be updated
     !!   rand [inout] -> random number generator
     !!
-    subroutine updateTrackMatXS(self, E, matIdx, rand)
+    subroutine updateTrackMatXS(self, E, matIdx, rand, f)
       import :: ceNeutronDatabase, defReal, shortInt, RNG
       class(ceNeutronDatabase), intent(in) :: self
       real(defReal), intent(in)            :: E
       integer(shortInt), intent(in)        :: matIdx
       class(RNG), optional, intent(inout)  :: rand
+      real(defReal), optional, intent(in)  :: f
     end subroutine updateTrackMatXS
 
     !!
@@ -128,12 +129,13 @@ module ceNeutronDatabase_inter
     !!   matIdx [in]  -> material index that needs to be updated
     !!   rand [inout] -> random number generator
     !!
-    subroutine updateTotalMatXS(self, E, matIdx, rand)
+    subroutine updateTotalMatXS(self, E, matIdx, rand, f)
       import :: ceNeutronDatabase, defReal, shortInt, RNG
       class(ceNeutronDatabase), intent(in) :: self
       real(defReal), intent(in)            :: E
       integer(shortInt), intent(in)        :: matIdx
       class(RNG), optional, intent(inout)  :: rand
+      real(defReal), optional, intent(in)  :: f
     end subroutine updateTotalMatXS
 
     !!
@@ -149,11 +151,12 @@ module ceNeutronDatabase_inter
     !!   E [in]       -> required energy [MeV]
     !!   rand [inout] -> random number generator
     !!
-    subroutine updateMajorantXS(self, E, rand)
+    subroutine updateMajorantXS(self, E, rand, f)
       import :: ceNeutronDatabase, defReal, RNG
       class(ceNeutronDatabase), intent(in) :: self
       real(defReal), intent(in)            :: E
       class(RNG), optional, intent(inout)  :: rand
+      real(defReal), optional, intent(in)  :: f
     end subroutine updateMajorantXS
 
     !!
@@ -170,12 +173,13 @@ module ceNeutronDatabase_inter
     !!   matIdx [in]  -> material index that needs to be updated
     !!   rand [inout] -> random number generator
     !!
-    subroutine updateMacroXSs(self, E, matIdx, rand)
+    subroutine updateMacroXSs(self, E, matIdx, rand, f)
       import :: ceNeutronDatabase, defReal, shortInt, RNG
       class(ceNeutronDatabase), intent(in) :: self
       real(defReal), intent(in)            :: E
       integer(shortInt), intent(in)        :: matIdx
       class(RNG), optional, intent(inout)  :: rand
+      real(defReal), optional, intent(in)  :: f
     end subroutine updateMacroXSs
 
     !!
@@ -286,11 +290,12 @@ contains
   !! Error:
   !!   fatalError if particle is not CE Neutron
   !!
-  function getTrackingXS(self, p, matIdx, what) result(xs)
+  function getTrackingXS(self, p, matIdx, what, f) result(xs)
     class(ceNeutronDatabase), intent(inout) :: self
     class(particle), intent(in)             :: p
     integer(shortInt), intent(in)           :: matIdx
     integer(shortInt), intent(in)           :: what
+    real(defReal), optional, intent(in)     :: f
     real(defReal)                           :: xs
     character(100),parameter :: Here = 'getTrackingXS (ceNeutronDatabase_inter.f90)'
 
@@ -298,7 +303,11 @@ contains
     select case(what)
 
       case (MATERIAL_XS)
-        xs = self % getTrackMatXS(p, matIdx)
+        if (present(f)) then
+          xs = self % getTrackMatXS(p, matIdx, f)
+        else
+          xs = self % getTrackMatXS(p, matIdx)
+        end if
 
       case (MAJORANT_XS)
         xs = self % getMajorantXS(p)
@@ -335,10 +344,11 @@ contains
   !! Error:
   !!   fatalError if particle is not CE Neutron
   !!
-  function getTrackMatXS(self, p, matIdx) result(xs)
+  function getTrackMatXS(self, p, matIdx, f) result(xs)
     class(ceNeutronDatabase), intent(inout) :: self
     class(particle), intent(in)             :: p
     integer(shortInt), intent(in)           :: matIdx
+    real(defReal), optional, intent(in)     :: f
     real(defReal)                           :: xs
     character(100),parameter :: Here = 'getTrackMatXS (ceNeutronDatabase_inter.f90)'
 
@@ -348,8 +358,13 @@ contains
     end if
 
     ! Check Cache and update if needed
-    if (materialCache(matIdx) % E_track /= p % E) call self % updateTrackMatXS(p % E, matIdx, p % pRNG)
-
+    if (materialCache(matIdx) % E_track /= p % E) then 
+      if (present(f)) then 
+        call self % updateTrackMatXS(p % E, matIdx, p % pRNG, f)
+      else 
+        call self % updateTrackMatXS(p % E, matIdx, p % pRNG)
+      end if
+    end if
     ! Return Cross-Section
     xs = materialCache(matIdx) % trackXS
 

@@ -219,14 +219,17 @@ contains
       p % r        = r
       if (self % gpcPert == 0) then
         p % X    = TWO * rand % get() - ONE
+        p % X(4) = TWO * rand % get() - ONE
         p % gpcPert = 1
       else if (self % gpcPert == 1) then
         p % X(:2) = TWO * rand % get() - ONE
         p % X(3) = ZERO
+        p % X(4) = TWO * rand % get() - ONE
         p % gpcPert = 1
       else if (self % gpcPert == 2) then
         p % X(:2) = ZERO
         p % X(3) = TWO * rand % get() - ONE
+        p % X(4) = TWO * rand % get() - ONE
         p % gpcPert = 3
       else 
         p % X = ZERO

@@ -104,12 +104,13 @@ module nuclearDatabase_inter
     !!   Undefined behaviour if the state of the particle is invalid e.g. -ve energy
     !!   Undefined behavior if matIdx does not correspond to a defined material
     !!
-    function getTrackingXS(self, p, matIdx, what) result(xs)
+    function getTrackingXS(self, p, matIdx, what, f) result(xs)
       import :: nuclearDatabase, particle, shortInt, defReal
       class(nuclearDatabase), intent(inout) :: self
       class(particle), intent(in)           :: p
       integer(shortInt), intent(in)         :: matIdx
       integer(shortInt), intent(in)         :: what
+      real(defReal), optional, intent(in)   :: f
       real(defReal)                         :: xs
     end function getTrackingXS
 
@@ -131,11 +132,12 @@ module nuclearDatabase_inter
     !!   Undefined behaviour if the state of the particle is invalid e.g. -ve energy
     !!   Undefined behavior if matIdx does not correspond to a defined material
     !!
-    function getTrackMatXS(self, p, matIdx) result(xs)
+    function getTrackMatXS(self, p, matIdx, f) result(xs)
       import :: nuclearDatabase, particle, shortInt, defReal
       class(nuclearDatabase), intent(inout) :: self
       class(particle), intent(in)           :: p
       integer(shortInt), intent(in)         :: matIdx
+      real(defReal), optional, intent(in)   :: f
       real(defReal)                         :: xs
     end function getTrackMatXS
 

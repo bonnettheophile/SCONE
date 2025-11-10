@@ -122,7 +122,7 @@ contains
       class(implicitChaosClerk), intent(in) :: self
       integer(shortInt)                    :: S
     
-      S = self % P + 1
+      S = (self % P + 1)**2
     end function getSize
 
     subroutine reportCycleStart(self, start, mem)
@@ -146,18 +146,24 @@ contains
       class(particle), intent(in)             :: p
       class(nuclearDatabase),intent(inout)    :: xsData
       type(scoreMemory), intent(inout)        :: mem
-      real(defReal)                           :: score, val
-      real(defReal), dimension(self % P + 1)  :: legendrePol
-      integer(shortInt)                       :: j
+      real(defReal)                           :: score, val, val2
+      real(defReal), dimension(2, self % P + 1)  :: legendrePol
+      integer(shortInt)                       :: j, k
+      integer(longInt)                        :: address
 
 
       if (p % fate /= leak_FATE) then
         val = p % X(p % gpcPert)
+        val2 = p % X(4)
         ! Evaluate Legendre polynomials up to right order
-        legendrePol = evaluateLegendre(self % P, val) 
+        legendrePol(1,:) = evaluateLegendre(self % P, val) 
+        legendrePol(2,:) = evaluateLegendre(self % P, val2) 
         do j = 1, self % P + 1
-          score = (2*(j-1) + 1) * legendrePol(j) * p % w / self % startPop
-          call mem % score(score, self % getMemAddress() + j - 1)
+          do k = 1, self % P + 1
+            score = (2*(j-1) + 1) * (2*(k-1) + 1) * legendrePol(1,j) * legendrePol(2,k) * p % w / self % startPop
+            address = self % getMemAddress() + k + (j-1) * (self % P + 1) - 1
+            call mem % score(score, address)
+          end do
         end do
       end if
     end subroutine reportHist

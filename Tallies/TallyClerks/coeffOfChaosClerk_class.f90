@@ -50,7 +50,7 @@ module coeffOfChaosClerk_class
 
     type, public, extends(tallyClerk) :: coeffOfChaosClerk
       private
-        real(defReal), dimension(:), allocatable :: chaosOfPop   ! Coefficients for the end of generation pop
+        real(defReal), dimension(:,:), allocatable :: chaosOfPop   ! Coefficients for the end of generation pop
         integer(shortInt)                        :: P            ! Order of gpc model
         real(defReal)                            :: startPop
 
@@ -64,6 +64,7 @@ module coeffOfChaosClerk_class
 
       procedure :: reportCycleStart
       procedure :: reportCycleEnd
+      procedure :: computeChaosPop
 
       procedure :: print
       procedure :: display
@@ -86,7 +87,7 @@ contains
       ! Order keyword must be present
       if (dict % isPresent('order')) then
         call dict % get(self % P, ' order')
-        allocate(self % chaosOfPop(self % P + 1))
+        allocate(self % chaosOfPop(2, self % P + 1))
         self % chaosOfPop = ZERO
       else 
         call fatalError(Here, "Order must by provided") 
@@ -125,7 +126,7 @@ contains
       class(coeffOfChaosClerk), intent(in) :: self
       integer(shortInt)                    :: S
     
-      S = self % P + 1
+      S = (self % P + 1)**2 
       !if (allocated(self % map)) S = self % map % bins(0)
     end function getSize
 
@@ -148,11 +149,12 @@ contains
       class(coeffOfChaosClerk), intent(inout)     :: self
       class(particleDungeon), intent(in)          :: end
       type(scoreMemory), intent(inout)            :: mem
-      real(defReal), dimension(self % P + 1)      :: legendrePol, tmp_score
+      real(defReal), dimension(2, self % P + 1)   :: legendrePol, tmp_score
       real(defReal), dimension(:,:), allocatable  :: gaussPoints
-      real(defReal)                               :: chaosPop, lastChaosPop
+      real(defReal)                               :: chaosPop, lastChaosPop, score, gaussWgt, polProduct
       type(particle)                              :: p
-      integer(shortInt)                           :: i, j, G
+      integer(shortInt)                           :: i, j1, j2, k1, k2, G
+      integer(longInt)                            :: address
       character(100),parameter :: Here = 'reportCycleEnd (coeffOfChaosClerk.f90)'
 
       ! Get adequate quadrature parameters
@@ -178,9 +180,13 @@ contains
       do i = 1, end % popSize()
         p = end % get(i)
         ! Evaluate Legendre polynomials up to right order 
-        legendrePol = evaluateLegendre(self % P, p % X(p % gpcPert)) 
-        do j = 1, self % P + 1
-          tmp_score(j) = tmp_score(j) + (2*(j-1) + 1) * legendrePol(j) * p % w * p % k_eff
+        legendrePol(1,:) = evaluateLegendre(self % P, p % X(p % gpcPert)) 
+        legendrePol(2,:) = evaluateLegendre(self % P, p % X(4)) 
+        do j2 = 1, self % P + 1
+          do j1 = 1, self % P + 1
+          tmp_score(j1, j2) = tmp_score(j1, j2) + (2*(j1-1) + 1) * legendrePol(1,j1)*(2*(j2-1) + 1) &
+                                * legendrePol(2,j2) * p % w * p % k_eff
+          end do
         end do
       end do
 
@@ -189,24 +195,57 @@ contains
 
       ! Reinitialise temporary score
       tmp_score = ZERO
+      
       ! Use chaos model to determine population at quadrature points
-      do i = 1, G
-        legendrePol = evaluateLegendre(self % P, gaussPoints(1, i))
-        chaosPop = sum(legendrePol * self % chaosOfPop)
-        lastChaosPop = self % startPop
-        do j = 1, self % P + 1
-          tmp_score(j) = tmp_score(j) + &
-               (2*(j-1) + 1) * legendrePol(j) * chaosPop / lastChaosPop * gaussPoints(2,i) / TWO
+      ! Loop on gpc order
+      do j2 = 1, self % P + 1
+        do j1 = 1, self % P + 1
+          ! Loop for 3d gauss quadrature
+          score = ZERO
+          do k2 = 1, G
+            legendrePol(1,:) = evaluateLegendre(self % P, gaussPoints(1, k2))
+            do k1 = 1, G
+              legendrePol(2,:) = evaluateLegendre(self % P, gaussPoints(1, k1))
+              gaussWgt = gaussPoints(2, k1) * gaussPoints(2, k2) / (TWO**2)
+              polProduct = legendrePol(1,j1) * legendrePol(2,j2)
+              chaosPop = self % computeChaosPop(gaussPoints(1, k1), gaussPoints(1, k2))
+              score = score + (TWO*(j1-ONE) + ONE)*(TWO*(j2-ONE) + ONE) * polProduct * gaussWgt &
+                        * chaosPop / self % startPop
+            end do
+          end do
+          tmp_score(j1,j2) = tmp_score(j1,j2) + score
         end do
       end do
 
       ! Score coefficients for chaotic keff
-      do i = 1, self % P + 1
-        call mem % accumulate(tmp_score(i), self % getMemAddress() + i - 1)
-      end do 
+      do j2 = 1, self % P + 1
+        do j1 = 1, self % P + 1
+          address = self % getMemAddress() + j1 + (j2-1) * (self % P+1) - 1
+          call mem % accumulate(tmp_score(j1, j2), address)
+        end do
+      end do
       deallocate(gaussPoints)
 
     end subroutine reportCycleEnd
+
+    ! Compute the population using the polynomial model
+    function computeChaosPop(self, x, y) result(pop)
+    class(coeffOfChaosClerk), intent(in)   :: self
+    real(defReal), intent(in)                 :: x, y
+    real(defReal)                             :: pop
+    real(defReal), dimension(2, self % P + 1) :: legendrePol
+    integer(shortInt)                         :: i, j, P
+
+    P = self % P
+    pop = ZERO
+    legendrePol(1,:) = evaluateLegendre(P, x)
+    legendrePol(2,:) = evaluateLegendre(P, y)
+    do j = 1, P + 1
+      do i = 1, P + 1
+        pop = pop + self % chaosOfPop(i,j) * legendrePol(1,i) * legendrePol(2, j)
+      end do
+    end do
+  end function computeChaosPop
 
   !!
   !! Display convergence progress on the console

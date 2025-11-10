@@ -90,7 +90,7 @@ contains
       ! Order keyword must be present
       if (dict % isPresent('fitOrder')) then
         call dict % get(self % fitOrder, ' fitOrder')
-        allocate(self % fitCoeff(1, self % fitOrder + 1))
+        allocate(self % fitCoeff(2, self % fitOrder + 1))
         self % fitCoeff = ZERO
       else 
         call fatalError(Here, "fitOrder must by provided") 
@@ -168,16 +168,18 @@ contains
       type(scoreMemory), intent(inout)            :: mem
       type(particleState)                         :: state
       type(particle)                              :: p
-      integer(shortInt)                           :: i, binIdx
+      integer(shortInt)                           :: i, j, binIdx
       real(defReal), dimension(size(self % binCentre))                      :: x, b
       real(defReal), dimension(size(self % binCentre), self % fitOrder+1)   :: A 
       character(100),parameter :: Here = 'reportCycleEnd (uncertainProbClerk.f90)'
 
+      do j=1, 2
       ! Reinialize histogram array
       self % histogram = ZERO
       do i = 1, end % popSize()
         p = end % get(i)
-        state = p 
+        state = p
+        if (j == 2) state % X( p % gpcPert) = state % X(4) 
 
         ! Find bin index
         if (allocated(self % map)) then
@@ -203,11 +205,12 @@ contains
       call solveLeastSquare(A, x, b)
       ! Save fit results
       if (.not. self % inactive) then
-        self % fitCoeff(1,:) = self % fitCoeff(1,:) + (x(1:self % fitOrder+1) - self % fitCoeff(1,:)) / (mem % cycles+1)
+        self % fitCoeff(j,:) = self % fitCoeff(j,:) + (x(1:self % fitOrder+1) - self % fitCoeff(j,:)) / (mem % cycles+1)
       else
-        self % fitCoeff(1,:) = x(1:self % fitOrder+1) 
+        self % fitCoeff(j,:) = x(1:self % fitOrder+1) 
       end if
       call kill_linearAlgebra()
+    end do
 
     end subroutine reportCycleEnd
 

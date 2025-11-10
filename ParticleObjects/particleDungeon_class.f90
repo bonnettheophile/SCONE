@@ -733,6 +733,7 @@ contains
     real(defReal), dimension(self % pop)      :: imp, wgt
     !real(defReal)                             :: x(size(coeffs, dim=1), self % pop)
     real(defReal)                             :: x(1, self % pop)
+    real(defReal)                             :: y(1, self % pop)
     type(polynomial)                          :: pol(size(coeffs, dim=1))
     character(100), parameter :: Here = 'importanceCombing (particleDungeon_class.f90)'
 
@@ -742,6 +743,8 @@ contains
     do i = 1, size(coeffs, dim=1)
       call pol(i) % build(coeffs(i,:))
     end do
+    print *, "Coeff of geometry prob: ", coeffs(1,:)
+    print *, "Coeff of density prob: ", coeffs(2,:)
 
     ! Shuffle to avoid bias
     call shuffle(self, rand)
@@ -753,10 +756,12 @@ contains
     imp = ONE
     gpcIdx = self % prisoners(1) % gpcPert
     ! Compute total importance * weight
-    do i = 1, size(pol)
-      x(1, :) = self % prisoners(1 : self % pop) % X(gpcIdx)
-      imp = imp * pol(i) % evaluate(x)
-    end do
+    x(1, :) = self % prisoners(1 : self % pop) % X(gpcIdx)
+    y(1, :) = self % prisoners(1 : self % pop) % X(4)
+    !do i = 1, size(pol)
+      imp = imp * pol(1) % evaluate(x)
+      imp = imp * pol(2) % evaluate(y)
+    !end do
     imp = ONE / imp
     ! Check that all importance values are positive
     if (any(imp < ZERO)) call fatalError(Here, "Negative importance: increase particle number or fit order")

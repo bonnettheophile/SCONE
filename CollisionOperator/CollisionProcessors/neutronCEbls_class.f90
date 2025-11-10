@@ -247,7 +247,7 @@ contains
     if(.not.associated(self % mat)) call fatalError(Here, 'Material is not ceNeutronMaterial')
 
     ! Select collision nuclide
-    call self % mat % sampleNuclide(p % E, p % pRNG, collDat % nucIdx, collDat % E)
+    call self % mat % sampleNuclide(p % E, p % pRNG, collDat % nucIdx, collDat % E, p % f(4))
 
     ! If nuclide was rejected in TMS loop return to tracking
     if (collDat % nucIdx == REJECTED) then

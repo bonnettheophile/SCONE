@@ -58,8 +58,10 @@ module materialMenu_mod
     integer(shortInt)  :: T = -1
     logical(defBool)   :: hasSab = .false.
     logical(defBool)   :: sabMix = .false.
+    logical(defBool)   :: hasGPC = .false.
     character(nameLen) :: file_Sab1
     character(nameLen) :: file_Sab2
+    character(nameLen) :: gpcMat
   contains
     procedure :: init   => init_nuclideInfo
     procedure :: toChar => toChar_nuclideInfo
@@ -298,10 +300,11 @@ contains
     character(nameLen), intent(in)                :: name
     integer(shortInt), intent(in)                 :: idx
     class(dictionary), intent(in)                 :: dict
-    character(nameLen), dimension(:), allocatable :: keys, moderKeys, filenames
+    character(nameLen), dimension(:), allocatable :: keys, moderKeys, gpcKeys, filenames
     integer(shortInt), dimension(:), allocatable  :: temp
-    integer(shortInt)                             :: i, nSab, foundModer
-    class(dictionary),pointer                     :: compDict, moderDict
+    integer(shortInt)                             :: i, nSab, foundModer, nZ
+    character(nameLen)                            :: gpcName
+    class(dictionary),pointer                     :: compDict, moderDict, gpcDict
     character(100), parameter :: Here = 'init_materialItem (materialMenu_mod.f90)'
 
     ! Return to initial state
@@ -376,6 +379,45 @@ contains
               numToChar(nSab)//' nuclides requested but '//numToChar(foundModer)//' nuclides found.')
     end if
 
+    ! ><><><><><><><><>< GPC ><><><><><><><><><><><
+
+    ! Check if gpc calculation is to be run
+
+    if (dict % isPresent('gpc')) then
+
+      gpcDict => dict % getDictPtr('gpc')
+      call gpcDict % keys(gpcKeys)
+      nZ = size(gpcKeys)
+    else
+      nZ = 0
+    end if
+
+    ! Load definitions
+    foundModer = 0
+
+    do i = 1, size(keys)
+      ! Check if zeta is to be calculated for that nuclide
+      if ((nZ > 0) .and. gpcDict % isPresent(keys(i))) then
+        self % nuclides(i) % hasGPC = .true.
+        foundModer = foundModer + 1
+        ! Save material name
+
+        call gpcDict % get(gpcName, keys(i))
+        self % nuclides(i) % gpcMat = gpcName
+      end if
+    end do
+
+    ! Make sure if a moderator is provided the nuclide is present
+    ! in the composition
+
+    if (foundModer /= nZ) then
+      print*, gpcKeys
+      call fatalError(Here, 'Nuclides requested for gpc scaling are not present in composition. '// &
+              numToChar(nSab)//' nuclides requested but '//numToChar(foundModer)//' nuclides found.')
+    end if
+
+    ! ><><><><><><><><>< GPC ><><><><><><><><><><><
+
     ! Add colour info if present
     if(dict % isPresent('rgb')) then
       call dict % get(temp, 'rgb')
@@ -389,6 +431,8 @@ contains
 
     ! Save dictionary
     self % extraInfo = dict
+
+
 
     ! TODO: Remove composition subdictionary from extraInfo
     !       Or rather do not copy it in the first place

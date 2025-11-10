@@ -68,6 +68,7 @@ module ceNeutronMaterial_class
     procedure :: kill
     generic   :: getMacroXSs => getMacroXSs_byE
     procedure :: getMacroXSs_byP
+    generic   :: getNuclideDensity => getNuclideDensityGPC, getNuclideDensityUsual
 
     ! Local procedures
     procedure, non_overridable :: set
@@ -75,6 +76,8 @@ module ceNeutronMaterial_class
     procedure, non_overridable :: getMacroXSs_byE
     procedure                  :: isFissile
     procedure                  :: useTMS
+    procedure                  :: getNuclideDensityGPC
+    procedure                  :: getNuclideDensityUsual
     procedure, non_overridable :: sampleNuclide
     procedure, non_overridable :: sampleFission
     procedure, non_overridable :: sampleScatter
@@ -291,6 +294,43 @@ contains
   end function useTMS
 
   !!
+  !! Returns nuclide density
+  !! If gpc calculation, f is used to multiply the density
+  !!
+
+  function getNuclideDensityGPC(self, i, f) result(dens)
+    class(ceNeutronMaterial), intent(in) :: self
+    integer(shortInt), intent(in)        :: i
+    real(defReal), intent(in)            :: f
+    integer(shortInt)                    :: nucIdx
+    real(defReal)                        :: dens
+
+    dens   = self % dens(i)
+    nucIdx = self % nuclides(i)
+    if (trim(self % name) == 'water') print *, "bruh water"
+
+    if (self % gpcMap % length() /= 0) then
+      if ((self % gpcMap % getOrDefault(nucIdx, NOT_FOUND) /= NOT_FOUND)) then 
+        dens = dens * f
+      end if
+    end if
+  end function getNuclideDensityGPC
+
+  !!
+  !! Returns nuclide density
+  !!
+
+  function getNuclideDensityUsual(self, i) result(dens)
+    class(ceNeutronMaterial), intent(in) :: self
+    integer(shortInt), intent(in)        :: i
+    integer(shortInt)                    :: nucIdx
+    real(defReal)                        :: dens
+
+    dens   = self % dens(i)
+    nucIdx = self % nuclides(i)
+  end function getNuclideDensityUsual
+
+  !!
   !! Sample collision nuclide at energy E
   !!
   !! This function randomly determines the exact nuclide for a collision
@@ -306,12 +346,13 @@ contains
   !!   fatalError if sampling fails for some reason (E.G. random number > 1)
   !!   fatalError if E is out-of-bounds of the present data
   !!
-  subroutine sampleNuclide(self, E, rand, nucIdx, eOut)
+  subroutine sampleNuclide(self, E, rand, nucIdx, eOut, f)
     class(ceNeutronMaterial), intent(in) :: self
     real(defReal), intent(in)            :: E
     class(RNG), intent(inout)            :: rand
     integer(shortInt), intent(out)       :: nucIdx
     real(defReal), intent(out)           :: eOut
+    real(defReal), intent(in), optional  :: f
     class(ceNeutronNuclide), pointer     :: nuc
     integer(shortInt)                    :: i
     real(defReal)                        :: P_acc, eMin, eMax, A, eRel, &
@@ -329,7 +370,11 @@ contains
     do i = 1,size(self % nuclides)
 
       nucIdx = self % nuclides(i)
-      dens = self % dens(i)
+      if (present(f)) then
+        dens = self % getNuclideDensity(i,f)
+      else
+        dens = self % getNuclideDensity(i)
+      end if
 
       associate (nucCache => nuclideCache(nucIdx))
 
@@ -426,13 +471,14 @@ contains
   !!   fatalError if E is out-of-bounds of the present data
   !!   Returns nucIdx <= if material is not fissile
   !!
-  function sampleFission(self, E, rand) result(nucIdx)
+  function sampleFission(self, E, rand, f) result(nucIdx)
     class(ceNeutronMaterial), intent(in) :: self
     real(defReal), intent(in)            :: E
     class(RNG), intent(inout)            :: rand
+    real(defReal), intent(in), optional  :: f
     class(ceNeutronNuclide), pointer     :: nuc
     integer(shortInt)                    :: nucIdx, i
-    real(defReal)                        :: xs, doppCorr, A, nuckT, deltakT
+    real(defReal)                        :: xs, doppCorr, A, nuckT, deltakT, dens
     character(100), parameter :: Here = 'sampleFission (ceNeutronMaterial_class.f90)'
 
     ! Short-cut for nonFissile material
@@ -469,10 +515,16 @@ contains
         doppCorr = ONE
       end if
 
+      if (present(f)) then
+        dens = self % getNuclideDensity(i,f)
+      else 
+        dens = self % getNuclideDensity(i)
+      end if
+
       ! The nuclide cache should be at the right energy after updating the material
       ! In the case of TMS where the macro xss are at a relative energy, the nuclide
       ! xss to be used are at the relative energy just sampled
-      xs = xs - nuclideCache(nucIdx) % xss % nuFission * self % dens(i) * doppCorr
+      xs = xs - nuclideCache(nucIdx) % xss % nuFission * dens * doppCorr
 
       if (xs < ZERO) return
 
@@ -501,13 +553,14 @@ contains
   !!   fatalError if E is out-of-bounds of the present data
   !!   Returns nucIdx <= if material is a pure-absorber (with fission as absorbtion)
   !!
-  function sampleScatter(self, E, rand) result(nucIdx)
+  function sampleScatter(self, E, rand, f) result(nucIdx)
     class(ceNeutronMaterial), intent(in) :: self
     real(defReal), intent(in)            :: E
     class(RNG), intent(inout)            :: rand
+    real(defReal), intent(in), optional  :: f
     class(ceNeutronNuclide), pointer     :: nuc
     integer(shortInt)                    :: nucIdx, i
-    real(defReal)                        :: xs, doppCorr, A, nuckT, deltakT
+    real(defReal)                        :: xs, doppCorr, A, nuckT, deltakT, dens
     character(100), parameter :: Here = 'sampleScatter (ceNeutronMaterial_class.f90)'
 
     ! Calculate material macroscopic cross section of all scattering
@@ -540,11 +593,16 @@ contains
         doppCorr = ONE
       end if
 
+      if (present(f)) then
+        dens = self % getNuclideDensity(i,f)
+      else 
+        dens = self % getNuclideDensity(i)
+      end if
       ! The nuclide cache should be at the right energy after updating the material
       ! In the case of TMS where the macro xss are at a relative energy, the nuclide
       ! xss to be used are at the relative energy just sampled
       xs = xs - (nuclideCache(nucIdx) % xss % elasticScatter + &
-                 nuclideCache(nucIdx) % xss % inelasticScatter ) * self % dens(i) * doppCorr
+                 nuclideCache(nucIdx) % xss % inelasticScatter ) * dens * doppCorr
 
       if (xs < ZERO) return
 
@@ -573,13 +631,14 @@ contains
   !!   fatalError if E is out-of-bounds of the present data
   !!   Returns nucIdx <= if material is a pure-capture (with fission as scattering)
   !!
-  function sampleScatterWithFission(self, E, rand) result(nucIdx)
+  function sampleScatterWithFission(self, E, rand, f) result(nucIdx)
     class(ceNeutronMaterial), intent(in) :: self
     real(defReal), intent(in)            :: E
     class(RNG), intent(inout)            :: rand
+    real(defReal), intent(in), optional  :: f
     class(ceNeutronNuclide), pointer     :: nuc
     integer(shortInt)                    :: nucIdx, i
-    real(defReal)                        :: xs, doppCorr, A, nuckT, deltakT
+    real(defReal)                        :: xs, doppCorr, A, nuckT, deltakT, dens
     character(100), parameter :: Here = 'sampleScatterWithFission (ceNeutronMaterial_class.f90)'
 
     ! Calculate material macroscopic cross section of all scattering and fission
@@ -613,12 +672,18 @@ contains
         doppCorr = ONE
       end if
 
+      if (present(f)) then
+        dens = self % getNuclideDensity(i,f)
+      else 
+        dens = self % getNuclideDensity(i)
+      end if
+
       ! The nuclide cache should be at the right energy after updating the material
       ! In the case of TMS where the macro xss are at a relative energy, the nuclide
       ! xss to be used are at the relative energy just sampled
       xs = xs - (nuclideCache(nucIdx) % xss % elasticScatter + &
                  nuclideCache(nucIdx) % xss % inelasticScatter + &
-                 nuclideCache(nucIdx) % xss % fission) * self % dens(i) * doppCorr
+                 nuclideCache(nucIdx) % xss % fission) * dens * doppCorr
 
       if (xs < ZERO) return
 
