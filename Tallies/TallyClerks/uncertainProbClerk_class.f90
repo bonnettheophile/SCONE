@@ -169,8 +169,8 @@ contains
       type(particleState)                         :: state
       type(particle)                              :: p
       integer(shortInt)                           :: i, j, binIdx
-      real(defReal), dimension(size(self % binCentre))                      :: x, b
-      real(defReal), dimension(size(self % binCentre), self % fitOrder+1)   :: A 
+      real(defReal), dimension(size(self % binCentre))                     :: x, b
+      real(defReal), dimension(size(self % binCentre), self % fitOrder+1)  :: A 
       character(100),parameter :: Here = 'reportCycleEnd (uncertainProbClerk.f90)'
 
       do j=1, 2

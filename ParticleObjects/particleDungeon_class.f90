@@ -729,11 +729,9 @@ contains
     integer(shortInt)                         :: i, j, gpcIdx
     type(particleDungeon), save               :: tmp
     real(defReal)                             :: combPos, currentParticle
-    real(defReal)                             :: U, W
-    real(defReal), dimension(self % pop)      :: imp, wgt
+    real(defReal)                             :: U
+    real(defReal), dimension(self % pop)      :: imp
     !real(defReal)                             :: x(size(coeffs, dim=1), self % pop)
-    real(defReal)                             :: x(1, self % pop)
-    real(defReal)                             :: y(1, self % pop)
     type(polynomial)                          :: pol(size(coeffs, dim=1))
     character(100), parameter :: Here = 'importanceCombing (particleDungeon_class.f90)'
 
@@ -749,18 +747,12 @@ contains
     ! Shuffle to avoid bias
     call shuffle(self, rand)
 
-    ! Compute total weight 
-    wgt = self % prisoners(1 : self % pop) % wgt
-    W = sum(wgt)
-    
     imp = ONE
     gpcIdx = self % prisoners(1) % gpcPert
     ! Compute total importance * weight
-    x(1, :) = self % prisoners(1 : self % pop) % X(gpcIdx)
-    y(1, :) = self % prisoners(1 : self % pop) % X(4)
     !do i = 1, size(pol)
-      imp = imp * pol(1) % evaluate(x)
-      imp = imp * pol(2) % evaluate(y)
+      imp = imp * pol(1) % evaluate(self % prisoners(1 : self % pop) % X(gpcIdx))
+      imp = imp * pol(2) % evaluate(self % prisoners(1 : self % pop) % X(4))
     !end do
     imp = ONE / imp
     ! Check that all importance values are positive
