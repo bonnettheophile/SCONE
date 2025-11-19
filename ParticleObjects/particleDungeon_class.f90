@@ -751,8 +751,8 @@ contains
     gpcIdx = self % prisoners(1) % gpcPert
     ! Compute total importance * weight
     !do i = 1, size(pol)
-      imp = imp * pol(1) % evaluate(self % prisoners(1 : self % pop) % X(gpcIdx))
-      imp = imp * pol(2) % evaluate(self % prisoners(1 : self % pop) % X(4))
+      imp = imp * pol(1) % evaluate(reshape(self % prisoners(1 : self % pop) % X(gpcIdx), (/1, self % pop/)))
+      imp = imp * pol(2) % evaluate(reshape(self % prisoners(1 : self % pop) % X(4), (/1, self % pop/)))
     !end do
     imp = ONE / imp
     ! Check that all importance values are positive
