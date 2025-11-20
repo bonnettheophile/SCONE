@@ -721,15 +721,16 @@ contains
   !! Errors:
   !!   fatalError if negative importance
 
-  subroutine importanceCombing(self, rand, coeffs, N)
+  subroutine importanceCombing(self, rand, coeffs, N, hist)
     class(particleDungeon), intent(inout)     :: self
     class(RNG), intent(inout)                 :: rand
     real(defReal), intent(in)                 :: coeffs(:,:)
     integer(shortInt), intent(in)             :: N
-    integer(shortInt)                         :: i, j, gpcIdx
+    real(defReal), intent(in)                 :: hist(:,:)
+    integer(shortInt)                         :: i, j, gpcIdx, binX1, binX2
     type(particleDungeon), save               :: tmp
     real(defReal)                             :: combPos, currentParticle
-    real(defReal)                             :: U
+    real(defReal)                             :: U, dx
     real(defReal), dimension(self % pop)      :: imp
     !real(defReal)                             :: x(size(coeffs, dim=1), self % pop)
     type(polynomial)                          :: pol(size(coeffs, dim=1))
@@ -738,22 +739,31 @@ contains
     if (.not. allocated(tmp % prisoners)) call tmp % init(size(self % prisoners))
 
     ! Set polynomial approximation for inverse importance function
-    do i = 1, size(coeffs, dim=1)
-      call pol(i) % build(coeffs(i,:))
-    end do
-    print *, "Coeff of geometry prob: ", coeffs(1,:)
-    print *, "Coeff of density prob: ", coeffs(2,:)
+    !do i = 1, size(coeffs, dim=1)
+    !  call pol(i) % build(coeffs(i,:))
+    !end do
+    !print *, "Coeff of geometry prob: ", coeffs(1,:)
+    !print *, "Coeff of density prob: ", coeffs(2,:)
 
     ! Shuffle to avoid bias
-    call shuffle(self, rand)
+    !call shuffle(self, rand)
 
     imp = ONE
     gpcIdx = self % prisoners(1) % gpcPert
+    dx = TWO / 100
+
+    do i = 1, self % pop
+      binX1 = min(max(int((self % prisoners(i) % X(gpcIdx) + 1) / dx) + 1, 1), 100)
+      binX2 = min(max(int((self % prisoners(i) % X(4) + 1) / dx) + 1, 1), 100)
+
+      imp(i) = hist(binX1, binX2)
+    end do
     ! Compute total importance * weight
     !do i = 1, size(pol)
-      imp = imp * pol(1) % evaluate(reshape(self % prisoners(1 : self % pop) % X(gpcIdx), (/1, self % pop/)))
-      imp = imp * pol(2) % evaluate(reshape(self % prisoners(1 : self % pop) % X(4), (/1, self % pop/)))
+    !  imp = imp * pol(1) % evaluate(reshape(self % prisoners(1 : self % pop) % X(gpcIdx), (/1, self % pop/)))
+    !  imp = imp * pol(2) % evaluate(reshape(self % prisoners(1 : self % pop) % X(4), (/1, self % pop/)))
     !end do
+    if (any(imp == ZERO)) call fatalError(Here, "Zero importance: increase particle number or fit order")
     imp = ONE / imp
     ! Check that all importance values are positive
     if (any(imp < ZERO)) call fatalError(Here, "Negative importance: increase particle number or fit order")

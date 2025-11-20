@@ -175,6 +175,8 @@ contains
         self % dir = 2
       case('z')
         self % dir = 3
+      case('d')
+        self % dir = 4
       case default
         call fatalError(Here, "'axis' keyword must be: x, y, or z")
     end select
@@ -232,6 +234,8 @@ contains
         name = 'y'
       case(3)
         name = 'z'
+      case(4)
+        name = 'd'
     end select
   end function getAxisName
 

@@ -404,6 +404,7 @@ contains
 
         call gpcDict % get(gpcName, keys(i))
         self % nuclides(i) % gpcMat = gpcName
+        print *, gpcName
       end if
     end do
 

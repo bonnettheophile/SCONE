@@ -51,7 +51,7 @@ module uncertainProbClerk_class
       private
         class(tallyMap), allocatable             :: map
         integer(shortInt)                        :: fitOrder     ! Order of polyfit for pdf
-        real(defReal), allocatable               :: histogram(:)
+        real(defReal), allocatable               :: histogram(:,:)
         real(defReal), allocatable               :: binCentre(:)
         real(defReal), allocatable               :: fitCoeff(:,:)
         logical(defBool)                         :: inactive = .false.
@@ -99,12 +99,12 @@ contains
       ! Map is for following gpc coefficients
       if( dict % isPresent('map')) then
         call new_tallyMap(self % map, dict % getDictPtr('map'))
-        allocate(self % histogram(product(self % map % binArrayShape())))
+        allocate(self % histogram(product(self % map % binArrayShape()), product(self % map % binArrayShape())))
         allocate(self % binCentre(product(self % map % binArrayShape())))
 
         self % histogram = ZERO
 
-        dx = TWO / size(self % histogram)
+        dx = TWO / size(self % histogram(1,:))
         self % binCentre(1) = - ONE + dx / TWO
 
         ! Initialize binCentre, assume interval is [-1,1]
@@ -168,49 +168,53 @@ contains
       type(scoreMemory), intent(inout)            :: mem
       type(particleState)                         :: state
       type(particle)                              :: p
-      integer(shortInt)                           :: i, j, binIdx
+      integer(shortInt)                           :: i, j, binIdx, binIdx2 
       real(defReal), dimension(size(self % binCentre))                     :: x, b
       real(defReal), dimension(size(self % binCentre), self % fitOrder+1)  :: A 
       character(100),parameter :: Here = 'reportCycleEnd (uncertainProbClerk.f90)'
 
-      do j=1, 2
+      !do j=1, 2
       ! Reinialize histogram array
       self % histogram = ZERO
       do i = 1, end % popSize()
         p = end % get(i)
         state = p
-        if (j == 2) state % X( p % gpcPert) = state % X(4) 
-
-        ! Find bin index
         if (allocated(self % map)) then
           binIdx = self % map % map(state)
         else
           binIdx = 1
         end if
+        state % X( p % gpcPert) = state % X(4) 
+
+        ! Find bin index
+        if (allocated(self % map)) then
+          binIdx2 = self % map % map(state)
+        else 
+          binIdx2 = 1
+        end if
         ! Return if invalid bin index
         if (binIdx == 0) return
         
         ! Fill histogram of particles wrt their uncertain parameter
-        self % histogram(binIdx) = self % histogram(binIdx) + state % wgt
+        self % histogram(binIdx, binIdx2) = self % histogram(binIdx, binIdx2) + state % wgt
       end do
-
       ! Set x array for linear fitting
-      do i = 1, size(A, 2)
-        A(:,i) = self % binCentre**(i-1)
-      end do 
+      !do i = 1, size(A, 2)
+      !  A(:,i) = self % binCentre**(i-1)
+      !end do 
 
       ! Set y for linear fitting
-      b = self % histogram
+      !b = self % histogram
       ! Perform least square linear fitting using LAPACK 
-      call solveLeastSquare(A, x, b)
+      !call solveLeastSquare(A, x, b)
       ! Save fit results
-      if (.not. self % inactive) then
-        self % fitCoeff(j,:) = self % fitCoeff(j,:) + (x(1:self % fitOrder+1) - self % fitCoeff(j,:)) / (mem % cycles+1)
-      else
-        self % fitCoeff(j,:) = x(1:self % fitOrder+1) 
-      end if
+      !if (.not. self % inactive) then
+      !  self % fitCoeff(j,:) = self % fitCoeff(j,:) + (x(1:self % fitOrder+1) - self % fitCoeff(j,:)) / (mem % cycles+1)
+      !else
+      !  self % fitCoeff(j,:) = x(1:self % fitOrder+1) 
+      !end if
       call kill_linearAlgebra()
-    end do
+    !end do
 
     end subroutine reportCycleEnd
 
@@ -250,7 +254,7 @@ contains
       class(tallyResult), allocatable, intent(inout)    :: res
       type(scoreMemory), intent(in)                     :: mem
 
-      allocate(res, source= polyResult(self % fitCoeff))
+      allocate(res, source= polyResult(self % fitCoeff, self % histogram))
 
     end subroutine
       

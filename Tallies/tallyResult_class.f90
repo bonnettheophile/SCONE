@@ -44,7 +44,7 @@ module tallyResult_class
   !! Very simple class for the coefficients of a linear fit
   !!
   type, public, extends(tallyResult) :: polyResult
-    real(defReal), allocatable   ::  coefficients(:,:)
+    real(defReal), allocatable   ::  coefficients(:,:), histogram(:,:)
   end type
 
   type, public, extends(tallyResult) :: linearResult

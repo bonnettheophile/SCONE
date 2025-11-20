@@ -244,7 +244,7 @@ contains
         call tallyAtch % getResult(res, "uncertainFit")
         select type(res)
           type is(polyResult)
-            call self % nextCycle % importanceCombing(self % pRNG, res % coefficients, self % pop)
+            call self % nextCycle % importanceCombing(self % pRNG, res % coefficients, self % pop, res % histogram)
           class default
             call fatalError(Here, 'Invalid result has been returned')
         end select
