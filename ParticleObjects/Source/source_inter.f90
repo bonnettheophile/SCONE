@@ -6,6 +6,7 @@ module source_inter
   use dictionary_class,      only : dictionary
   use RNG_class,             only : RNG
   use geometry_inter,        only : geometry
+  use perturbationModel_class, only : perturbationModel
 
   implicit none
   private
@@ -35,8 +36,8 @@ module source_inter
   type, public, abstract :: source
     private
     class(geometry), pointer, public       :: geom => null()
-    real(defReal), public                  :: eps(4) ! parameters for generating virtual density coefficients
-    integer(shortInt), public              :: gpcPert = 0
+    type(perturbationModel), public        :: pertModel
+    logical(defBool), public               :: hasPert = .false.  
   contains
     procedure, non_overridable             :: generate
     procedure(sampleParticle), deferred    :: sampleParticle

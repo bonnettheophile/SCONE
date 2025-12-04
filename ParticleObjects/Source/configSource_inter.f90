@@ -128,6 +128,7 @@ contains
     class(configSource), intent(inout) :: self
     class(RNG), intent(inout)          :: rand
     type(particleState)                :: p
+    integer(shortInt)                  :: i
 
     call self % sampleType(p, rand)
     call self % samplePosition(p, rand)
@@ -135,10 +136,28 @@ contains
     call self % sampleEnergy(p, rand)
     p % time = ZERO
     p % wgt  = ONE
-    p % X    = 2 * rand % get() - ONE
-    p % f    = ONE + p % X * self % eps
+    if (self % hasPert) then
+      !allocate(p % X(self % pertModel % numPerturbations))
+      do i = 1, self % pertModel % numPerturbations
+          p % X(i) = TWO * rand % get() - ONE
+      end do
 
+      if (.not. self % pertModel % perturbationType == 2) then
+        if (self % pertModel % geometryType == 'isotropic') then
+          p % f = ONE + p % X(1) * self % pertModel % geometryMagnitude
+        else if (self % pertModel % geometryType == 'axial') then
+          p % f(3) = ONE + p % X(1) * self % pertModel % geometryMagnitude
+          p % f(:2) = ONE
+        else if (self % pertModel % geometryType == 'radial') then
+          p % f(:2) = ONE + p % X(1) * self % pertModel % geometryMagnitude
+          p % f(3) = ONE
+        end if
+      else
+        p % f = ONE
+      end if
+       p % f(4) = ONE + p % X(2) * self % pertModel % densMagnitude(1)
 
+    end if
   end function sampleParticle
 
   !!

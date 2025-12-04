@@ -153,8 +153,8 @@ contains
 
 
       if (p % fate /= leak_FATE) then
-        val = p % X(p % gpcPert)
-        val2 = p % X(4)
+        val = p % X(1)
+        val2 = p % X(2)
         ! Evaluate Legendre polynomials up to right order
         legendrePol(1,:) = evaluateLegendre(self % P, val) 
         legendrePol(2,:) = evaluateLegendre(self % P, val2) 

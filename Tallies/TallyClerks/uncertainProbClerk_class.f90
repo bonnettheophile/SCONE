@@ -184,7 +184,7 @@ contains
         else
           binIdx = 1
         end if
-        state % X( p % gpcPert) = state % X(4) 
+        state % X(1) = state % X(2) 
 
         ! Find bin index
         if (allocated(self % map)) then

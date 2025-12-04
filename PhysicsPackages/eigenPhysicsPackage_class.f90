@@ -526,25 +526,10 @@ contains
       end if
 
       ! Initialise dictionary for fissionSource initial condition
-      call locDict3 % init(5)
+      call locDict3 % init(4)
       call locDict3 % store('type', 'fissionSource')
       call locDict3 % store('data', trim(energy))
-
-      ! Check if range of uncertain parameters is present
-      if (tempDict % isPresent('eps')) then
-        call tempDict % get(eps_temp, 'eps')
-        call locDict3 % store('eps', eps_temp)
-      else
-        call fatalError(Here, 'polyChaos is set and no epsilon vector is provided')
-      end if
-
-      ! Check if geometrical perturbation kind is properly set
-      if (tempDict % isPresent('type')) then
-        call tempDict % get(char_temp, 'type')
-        call locDict3 % store('gpcPert', char_temp)
-      else
-        call fatalError(Here, 'polyChaos is set and no type is provided')
-      end if
+      call locDict3 % store('polyChaos', tempDict)
 
       ! Initialise dictionary for settings uncertainProbClerks
       call locDict4 % init(4)

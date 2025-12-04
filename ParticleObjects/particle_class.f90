@@ -62,8 +62,8 @@ module particle_class
     integer(shortInt)          :: uniqueID = -1     ! Unique id at the lowest coord level
     integer(shortInt)          :: collisionN = 0    ! Number of collisions
     integer(shortInt)          :: broodID = 0       ! ID of the source particle
-    real(defReal), dimension(4):: f = ONE   ! Virtual density coefficients
-    real(defReal), dimension(4):: X = ZERO  ! Value of random variable underlying f
+    real(defReal), dimension(4):: f = ONE     ! Virtual density coefficients
+    real(defReal) :: X(2)   ! Value of random variable underlying f
     integer(shortInt)          :: gpcPert = 0 ! Kind of geometrical perturbation
     real(defReal)              :: k_eff ! k_eff used for implicit fission generation
 
@@ -114,7 +114,7 @@ module particle_class
     integer(shortInt)          :: collisionN = 0 ! Index of the number of collisions the particle went through
     integer(shortInt)          :: broodID = 0    ! ID of the brood (source particle number)
     real(defReal), dimension(4):: f = ONE   ! Virtual density coefficients
-    real(defReal), dimension(4):: X = ZERO  ! Value of random variable underlying f
+    real(defReal):: X(2)  ! Value of random variable underlying f
     integer(shortInt)          :: gpcPert = 0 ! Kind of geometrical perturbation
 
     ! Particle processing information
@@ -198,7 +198,7 @@ contains
     real(defReal),intent(in)                :: E
     real(defReal),intent(in)                :: w
     real(defReal),dimension(4), intent(in), optional :: f
-    real(defReal),dimension(4), intent(in), optional :: X
+    real(defReal),dimension(2), intent(in), optional :: X
     real(defReal),optional,intent(in)       :: t
     integer(shortInt),intent(in),optional   :: type
     integer(shortInt),intent(in),optional   :: gpcPert
@@ -258,7 +258,7 @@ contains
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
     real(defReal),dimension(4),intent(in), optional   :: f
-    real(defReal),dimension(4),intent(in), optional   :: X
+    real(defReal),dimension(2),intent(in), optional   :: X
     real(defReal),intent(in)                :: w
     integer(shortInt),intent(in)            :: G
     real(defReal),intent(in),optional       :: t

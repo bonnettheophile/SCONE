@@ -753,8 +753,8 @@ contains
     dx = TWO / 100
 
     do i = 1, self % pop
-      binX1 = min(max(int((self % prisoners(i) % X(gpcIdx) + 1) / dx) + 1, 1), 100)
-      binX2 = min(max(int((self % prisoners(i) % X(4) + 1) / dx) + 1, 1), 100)
+      binX1 = min(max(int((self % prisoners(i) % X(1) + 1) / dx) + 1, 1), 100)
+      binX2 = min(max(int((self % prisoners(i) % X(2) + 1) / dx) + 1, 1), 100)
 
       imp(i) = hist(binX1, binX2)
     end do

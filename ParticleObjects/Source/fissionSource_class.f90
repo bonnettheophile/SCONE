@@ -88,25 +88,10 @@ contains
     self % geom => geom
 
     ! Get parameter for virtual density coefficient generation
-    if (dict % isPresent('eps')) then
-      call dict % get(temp, 'eps')
-    else
-      allocate(temp(4))
-      temp = ZERO
+    if (dict % isPresent('polyChaos')) then
+      call self % pertModel % init(dict % getDictPtr('polyChaos'))
+      self % hasPert = .true.
     end if
-    self % eps = temp
-
-    call dict % getOrDefault(type, 'gpcPert', 'none')
-    select case(type)
-      case('isotropic')
-        self % gpcPert = 0
-      case('radial')
-        self % gpcPert = 1
-      case('axial')
-        self % gpcPert = 2
-      case default
-        self % gpcPert = -1
-    end select
 
     ! Select Energy Type
     call dict % getOrDefault(type, 'data', 'ce')
@@ -222,27 +207,28 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
-      if (self % gpcPert == 0) then
-        p % X    = TWO * rand % get() - ONE
-        p % X(4) = TWO * rand % get() - ONE
-        p % gpcPert = 1
-      else if (self % gpcPert == 1) then
-        p % X(:2) = TWO * rand % get() - ONE
-        p % X(3) = ZERO
-        p % X(4) = TWO * rand % get() - ONE
-        p % gpcPert = 1
-      else if (self % gpcPert == 2) then
-        p % X(:2) = ZERO
-        p % X(3) = TWO * rand % get() - ONE
-        p % X(4) = TWO * rand % get() - ONE
-        p % gpcPert = 3
-      else 
-        p % X = ZERO
+      if (self % hasPert) then
+        !allocate(p % X(self % pertModel % numPerturbations))
+        do i = 1, self % pertModel % numPerturbations
+            p % X(i) = TWO * rand % get() - ONE
+        end do
+
+        if (.not. self % pertModel % perturbationType == 2) then
+          if (self % pertModel % geometryType == 'isotropic') then
+            p % f = ONE + p % X(1) * self % pertModel % geometryMagnitude
+          else if (self % pertModel % geometryType == 'axial') then
+            p % f(3) = ONE + p % X(1) * self % pertModel % geometryMagnitude
+            p % f(:2) = ONE
+          else if (self % pertModel % geometryType == 'radial') then
+            p % f(:2) = ONE + p % X(1) * self % pertModel % geometryMagnitude
+            p % f(3) = ONE
+          end if
+        else
+          p % f = ONE
+        end if
+        p % f(4) = ONE + p % X(2) * self % pertModel % densMagnitude(1)
       end if
       
-      p % f        = ONE + p % X * self % eps
-      
-
       ! Set Energy
       select type (nucData)
         class is (ceNeutronDatabase)
@@ -314,7 +300,6 @@ contains
     self % top    = ZERO
     self % E      = ZERO
     self % G      = 0
-    self % eps    = ZERO
 
   end subroutine kill
 
