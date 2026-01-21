@@ -149,7 +149,8 @@ contains
       class(coeffOfChaosClerk), intent(inout)     :: self
       class(particleDungeon), intent(in)          :: end
       type(scoreMemory), intent(inout)            :: mem
-      real(defReal), dimension(2, self % P + 1)   :: legendrePol, tmp_score
+      real(defReal), dimension(2, self % P + 1)   :: legendrePol
+      real(defReal), dimension(self % P + 1, self % P + 1)   :: tmp_score
       real(defReal), dimension(:,:), allocatable  :: gaussPoints
       real(defReal)                               :: chaosPop, lastChaosPop, score, gaussWgt, polProduct
       type(particle)                              :: p
@@ -180,8 +181,8 @@ contains
       do i = 1, end % popSize()
         p = end % get(i)
         ! Evaluate Legendre polynomials up to right order 
-        legendrePol(1,:) = evaluateLegendre(self % P, p % X(p % gpcPert)) 
-        legendrePol(2,:) = evaluateLegendre(self % P, p % X(4)) 
+        legendrePol(1,:) = evaluateLegendre(self % P, p % X(1)) 
+        legendrePol(2,:) = evaluateLegendre(self % P, p % X(2)) 
         do j2 = 1, self % P + 1
           do j1 = 1, self % P + 1
           tmp_score(j1, j2) = tmp_score(j1, j2) + (2*(j1-1) + 1) * legendrePol(1,j1)*(2*(j2-1) + 1) &
