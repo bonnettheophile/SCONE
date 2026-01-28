@@ -77,7 +77,7 @@ contains
 !   Data definitions for virtual density end here!
 
     ! Get majorat XS inverse: 1/Sigma_majorant
-    majorant_inv = ONE / self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS)
+    majorant_inv = ONE / self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS, p % f(4))
     preCosines = p % dirGlobal()
 
     scale = trim(self % scale_type)
@@ -137,7 +137,7 @@ contains
 
       ! Obtain the local cross-section
       
-      sigmaT = self % xsData % getTrackMatXS(p, p % matIdx())
+      sigmaT = self % xsData % getTrackMatXS(p, p % matIdx(), p % f(4))
 
       ! Roll RNG to determine if the collision is real or virtual
       ! Exit the loop if the collision is real, report collision if virtual
