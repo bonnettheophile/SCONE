@@ -1,24 +1,28 @@
 type eigenPhysicsPackage;
 
-pop      15000;
-active   500;
-inactive 200;
-XSdata   mg;
-dataType mg;
+pop      20000;
+active   100;
+inactive 50;
+XSdata   ce;
+dataType ce;
+polyChaos {type axial; eps (0.00 0.00 0.00); fitOrder 1; map {type uncertainMap; axis x; grid lin; min -1.0; max 1.0; N 100;}}
 
-collisionOperator { neutronCE {type neutronCEstd;}
+collisionOperator { neutronCE {type neutronCEstd; roulette 0; split 0; weightWindows 0;}
                     neutronMG {type neutronMGstd;}
                   }
 
-transportOperator { type transportOperatorDT;
+transportOperator { type transportOperatorST;
+                    cache 0;
+                    virtual_density 1;
+                    scale uniform;
+                    deform_type_1 expansion;
+                    factor_1 (1.0 1.0 1.0);
                   }
 inactiveTally {
               }
 
 activeTally  {
-                norm    fiss;
-                normVal 100;
-                fiss { type collisionClerk; response (fiss); fiss {type macroResponse; MT -6;}}
+                //keffgpc { type coeffOfChaosClerk; order 2;} 
         }
 
 geometry {
@@ -60,7 +64,6 @@ nuclearData {
 materials {
 
     fuel {
-      temp       273;
       composition {
         92235.03  0.037047;
       }

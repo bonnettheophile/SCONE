@@ -384,7 +384,6 @@ contains
         pTemp % E   = E_out
         pTemp % wgt = wgt
         pTemp % collisionN = 0
-        pTemp % Xold = p % X
         if (self % isotropic_pert) then 
           pTemp % X = 2*p % pRNG % get() - ONE
           pTemp % f = ONE + pTemp % X * self % eps
@@ -533,7 +532,6 @@ contains
         pTemp % E   = E_out
         pTemp % wgt = wgt * wD
         pTemp % collisionN = 0
-        pTemp % Xold = p % X
         if (self % isotropic_pert) then 
           pTemp % X = 2*p % pRNG % get() - ONE
           pTemp % f = ONE + pTemp % X * self % eps

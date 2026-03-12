@@ -53,8 +53,12 @@ module particle_class
     real(defReal),dimension(3) :: dir  = ZERO       ! Global direction
     real(defReal)              :: E    = ZERO       ! Energy
     integer(shortInt)          :: G    = 0          ! Energy group
+    real(defReal),dimension(3) :: f    = ONE        ! Virtual density coefficients
+    real(defReal),dimension(3) :: X    = ZERO       ! Value of random variable underlying f
+    integer(shortInt)          :: gpcPert = 0 ! Kind of geometrical perturbation
     logical(defBool)           :: isMG = .false.    ! Is neutron multi-group
     logical(defBool)           :: isPerturbed = .false.
+    real(defReal)              :: k_eff ! k_eff used for implicit fission generation
     integer(shortInt)          :: type = P_NEUTRON  ! Particle physical type
     real(defReal)              :: time = ZERO       ! Particle time position
     real(defReal)              :: lambda = INF      ! Precursor decay constant
@@ -74,10 +78,6 @@ module particle_class
   !!   display        -> Print debug information about the state to the console
   !!
   type, public, extends(particleStateData) :: particleState
-    real(defReal), dimension(3):: f = ONE   ! Virtual density coefficients
-    real(defReal), dimension(3):: X = ZERO  ! Value of random variable underlying f
-    integer(shortInt)          :: gpcPert = 0 ! Kind of geometrical perturbation
-    real(defReal)              :: k_eff ! k_eff used for implicit fission generation
 
   contains
     generic    :: assignment(=)  => fromParticle
@@ -185,6 +185,7 @@ module particle_class
     procedure :: rotate
     procedure :: teleport
     procedure :: point
+    procedure :: pointSaved
     procedure :: takeAboveGeom
     procedure :: setMatIdx
 
@@ -759,6 +760,18 @@ contains
   end subroutine point
 
   !!
+  !! Point particle in direction dir in highest nesting level
+  !! Propagates new direction to lower levels
+  !!
+  subroutine pointSaved(self, dir)
+    class(particle), intent(inout)          :: self
+    real(defReal), dimension(3), intent(in) :: dir
+
+    call self % coords % assignSavedDirection(dir)
+
+  end subroutine pointSaved
+
+  !!
   !! Resets the particle's nesting level
   !!
   pure subroutine takeAboveGeom(self)
@@ -904,6 +917,10 @@ contains
     LHS % wgt  = RHS % wgt
     LHS % r    = RHS % r
     LHS % dir  = RHS % dir
+    LHS % f    = RHS % f
+    LHS % X    = RHS % X
+    LHS % gpcPert = RHS % gpcPert
+    LHS % k_eff = RHS % k_eff
     LHS % E    = RHS % E
     LHS % G    = RHS % G
     LHS % isMG = RHS % isMG

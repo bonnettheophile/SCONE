@@ -251,7 +251,8 @@ contains
 
       ! Get boundary surface and apply BCs
       surf => self % geom % surfs % getPtr(self % geom % borderIdx)
-      call surf % explicitBC(coords % lvl(1) % r, coords % lvl(1) % dir)
+      call surf % explicitBC(coords % lvl(1) % r, coords % lvl(1) % savedDir)
+      call coords % assignDirection(coords % lvl(1) % savedDir)
 
       ! Place back in geometry
       call self % placeCoord(coords)
@@ -326,7 +327,8 @@ contains
 
       ! Get boundary surface and apply BCs
       surf => self % geom % surfs % getPtr(self % geom % borderIdx)
-      call surf % explicitBC(coords % lvl(1) % r, coords % lvl(1) % dir)
+      call surf % explicitBC(coords % lvl(1) % r, coords % lvl(1) % savedDir)
+      call coords % assignDirection(coords % lvl(1) % savedDir)
 
       ! Place back in geometry
       call self % placeCoord(coords)
@@ -382,7 +384,8 @@ contains
       ! Move to boundary and apply BC
       call coords % moveGlobal(dist)
       event = BOUNDARY_EV
-      call surf % explicitBC(coords % lvl(1) % r, coords % lvl(1) % dir)
+      call surf % explicitBC(coords % lvl(1) % r, coords % lvl(1) % savedDir)
+      call coords % assignDirection(coords % lvl(1) % savedDir)
       maxDist = dist
 
     end if

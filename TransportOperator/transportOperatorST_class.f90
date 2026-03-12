@@ -55,24 +55,23 @@ contains
   !! Performs surface tracking until a collision point is found
   !!
   subroutine surfaceTracking(self, p, tally, thisCycle, nextCycle)
-    class(transportOperatorST), intent(inout):: self
+    class(transportOperatorST), intent(inout) :: self
     class(particle), intent(inout)            :: p
     type(tallyAdmin), intent(inout)           :: tally
-    class(particleDungeon), intent(inout)      :: thisCycle
-    class(particleDungeon), intent(inout)      :: nextCycle
+    class(particleDungeon), intent(inout)     :: thisCycle
+    class(particleDungeon), intent(inout)     :: nextCycle
     integer(shortInt)                         :: event, collFate, i, current_mat
     real(defReal)                             :: sigmaT, dist, sigmaTrack, invSigmaTrack, &
                                                  speed, time, virtual_dist, flight_stretch_factor
-    real(defReal), dimension(3)                :: preCosines, cosines, virtual_cosines, real_vector, virtual_vector
+    real(defReal), dimension(3)               :: cosines, virtual_cosines, real_vector, virtual_vector
     type(distCache)                           :: cache
     real(defReal), parameter                  :: tol  = 1.0E-12
     character(100), parameter:: Here = 'surfaceTracking (transportOperatorST_class.f90)'
 
-    preCosines = p % dirGlobal()
-
-    
     STLoop: do
-        
+      ! Store initial particle direction for use in virtual density transformations
+      call p % pointSaved(p % dirGlobal())
+
       ! Get local conditions
       call self % localConditions(p)
       
@@ -91,7 +90,6 @@ contains
         invSigmaTrack = ONE / sigmaTrack
         dist = -log( p % pRNG % get()) * invSigmaTrack
       
-        ! Obtain the local cross-section
         sigmaT = self % xsData % getTrackMatXS(p, p % matIdx())
 
         ! Should never happen  ! Catches NaN distances
@@ -115,6 +113,9 @@ contains
         collFate = NO_FATE
       end if
 
+      ! Save state before movement
+      call p % savePrePath()
+
       if (self % virtual_density) then
         ! If uniform virtual density, should always be 1
         current_mat = 1
@@ -130,7 +131,7 @@ contains
         end if
 
         if (p % isPerturbed .or. trim(self % scale_type) == 'uniform') then
-          cosines(:) = preCosines 
+          cosines(:) = p % coords % lvl(1) % savedDir 
           real_vector = dist*cosines
 
           if (self % deform_type(current_mat) == 'swelling') then
@@ -155,17 +156,15 @@ contains
           end if
         
           call p % point(virtual_cosines)
+
           dist = virtual_dist
           
         end if
       end if
 
-      ! Save state before movement
-      call p % savePrePath()
-
       ! Move to the next stop.
       if (self % cache) then
-        call self % geom % move_withCache(p % coords, dist, event, cache)
+        call self % geom % move(p % coords, dist, event, cache)
 
       else
         call self % geom % move(p % coords, dist, event)
@@ -178,7 +177,7 @@ contains
       ! Set fate if a collision occurred
       if (event == COLL_EV) p % fate = collFate
       
-      call p % point(preCosines)
+      !print *, "Particle location: end ", p % dirGlobal()
       ! Send tally report for a path moved
       call tally % reportPath(p, dist)
 
@@ -192,6 +191,7 @@ contains
         ! Give error if the particle somehow ended in an undefined material
         case(UNDEF_MAT)
           print *, "Particle location: ", p % rGlobal()
+          print *, "Particle f", p % f
           call fatalError(Here, "Particle is in undefined material")
         
         ! Give error if the particle is in a region with overlapping cells
@@ -216,6 +216,7 @@ contains
           call tally % reportInColl(p, .true.)
         end if
       end if
+
 
     end do STLoop
 

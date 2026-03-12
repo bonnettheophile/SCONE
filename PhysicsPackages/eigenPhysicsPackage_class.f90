@@ -457,7 +457,6 @@ contains
 
     ! Check if the calculation has to be reproducible with MPI
     call dict % getOrDefault(self % reproducible, 'reproducible', .true.)
-    call dict % getOrDefault(self % polyChaos, 'polyChaos', .false.)
 
     ! Parallel buffer size
     call dict % getOrDefault(self % bufferSize, 'buffer', 1000)

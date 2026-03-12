@@ -184,6 +184,7 @@ contains
         end do
       end do
 
+
       ! Update chaos model for new population size
       self % chaosOfPop = self % chaosOfPop + (tmp_score - self % chaosOfPop) / (mem % cycles+1)
 

@@ -32,6 +32,7 @@ module coord_class
   type, public :: coord
     real(defReal), dimension(3)   :: r         = ZERO
     real(defReal), dimension(3)   :: dir       = ZERO
+    real(defReal), dimension(3)   :: savedDir  = ZERO
     logical(defBool)              :: isRotated = .false.
     real(defReal), dimension(3,3) :: rotMat    = ZERO
     integer(shortInt)             :: uniIdx    = 0
@@ -107,6 +108,7 @@ module coord_class
     procedure :: cell
     procedure :: assignPosition
     procedure :: assignDirection
+    procedure :: assignSavedDirection
 
   end type coordList
 
@@ -159,6 +161,7 @@ contains
 
     self % r         = ZERO
     self % dir       = ZERO
+    self % savedDir  = ZERO
     self % isRotated = .false.
     self % rotMat    = ZERO
     self % uniIdx    = 0
@@ -194,6 +197,7 @@ contains
 
     self % lvl(1) % r = r
     self % lvl(1) % dir = u
+    self % lvl(1) % savedDir = u
     self % nesting = 1
 
   end subroutine init
@@ -465,5 +469,26 @@ contains
     end do
 
   end subroutine assignDirection
+
+  pure subroutine assignSavedDirection(self, u)
+    class(coordList), intent(inout)         :: self
+    real(defReal), dimension(3), intent(in) :: u
+    integer(shortInt)                       :: i
+
+    ! Assign new direction in global frame
+    self % lvl(1) % savedDir = u
+
+    ! Propage the change to lower levels
+    do i = 2, self % nesting
+      if(self % lvl(i) % isRotated) then
+        self % lvl(i) % savedDir = matmul(self % lvl(i) % rotMat, self % lvl(i-1) % savedDir)
+
+      else
+        self % lvl(i) % savedDir = self % lvl(i-1) % savedDir
+
+      end if
+    end do
+
+  end subroutine assignSavedDirection
 
 end module coord_class
