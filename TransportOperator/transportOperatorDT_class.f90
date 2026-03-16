@@ -24,6 +24,8 @@ module transportOperatorDT_class
   ! Nuclear data interfaces
   use nuclearDataReg_mod,       only : ndReg_get => get
   use nuclearDatabase_inter,    only : nuclearDatabase
+  use materialMenu_mod,            only : mm_matIdx => matIdx
+
 
   implicit none
   private
@@ -32,6 +34,13 @@ module transportOperatorDT_class
   !! Transport operator that moves a particle with delta tracking
   !!
   type, public, extends(transportOperator) :: transportOperatorDT
+    real(defReal)                    :: product_factor 
+    real(defReal), dimension(:,:), allocatable      :: vector_factor
+    logical(defBool)                 :: virtual_density, cross_over = .false.
+    character(nameLen)               :: direction_type, scale_type
+    character(nameLen), allocatable  :: pert_mat(:), deform_type(:)
+    integer(shortInt), allocatable   :: pert_mat_id(:)
+    integer(shortInt)                :: nb_pert_mat
   contains
     procedure :: transit => deltaTracking
     ! Override procedure
@@ -51,6 +60,8 @@ contains
     class(particleDungeon), intent(inout)     :: thisCycle
     class(particleDungeon), intent(inout)     :: nextCycle
     real(defReal)                             :: majorant_inv, sigmaT, distance, speed, time
+    real(defReal)                             :: cosines(3), real_vector(3), virtual_vector(3)
+    real(defReal)                             :: virtual_cosines(3), virtual_dist, flight_stretch_factor
     character(100), parameter :: Here = 'deltaTracking (transportOperatorDT_class.f90)'
 
     ! Get majorant XS inverse: 1/Sigma_majorant
@@ -60,6 +71,7 @@ contains
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
     DTLoop:do
+      call p % pointSaved(p % dirGlobal())
       distance = -log( p% pRNG % get() ) * majorant_inv
         
       speed = p % getSpeed()
@@ -71,7 +83,38 @@ contains
         p % fate = AGED_FATE
       end if
 
+      if (self % virtual_density .and. trim(self % scale_type) == 'uniform') then
+        cosines(:) = p % coords % lvl(1) % savedDir 
+        real_vector = distance*cosines
+
+        if (self % deform_type(1) == 'swelling') then
+          virtual_vector(1) = real_vector(1) * p % f(2) * p % f(3)
+          virtual_vector(2) = real_vector(2) * p % f(1) * p % f(3)
+          virtual_vector(3) = real_vector(3) * p % f(1) * p % f(2)
+          virtual_dist = sqrt(sum(virtual_vector**2))
+          flight_stretch_factor = virtual_dist/distance
+          virtual_cosines(1) = cosines(1) * p % f(2) * &
+              p % f(3) / flight_stretch_factor
+          virtual_cosines(2) = cosines(2) * p % f(1) * &
+              p % f(3) / flight_stretch_factor
+          virtual_cosines(3) = cosines(3) * p % f(1) * &
+              p % f(2) / flight_stretch_factor
+        elseif (self % deform_type(1) == 'expansion') then
+          virtual_vector = real_vector/p % f
+          virtual_dist = sqrt(sum(virtual_vector**2))
+          flight_stretch_factor = virtual_dist/distance
+          virtual_cosines = cosines / (p % f*flight_stretch_factor)
+        else
+          call fatalError(Here, 'Unrecognised geometric deformation')
+        end if
+      
+        call p % point(virtual_cosines)
+
+        distance = virtual_dist
+      end if
+
       ! Move particle in the geometry and time
+      ! Note: teleport routine has been modified to use savedDir instead of current dir
       call self % geom % teleport(p % coords, distance)
       p % time = p % time + distance / speed
       
@@ -135,11 +178,53 @@ contains
   !! See transportOperator_inter for more details
   !!
   subroutine init(self, dict)
-    class(transportOperatorDT), intent(inout) :: self
+    class(transportOperatorDT), intent(inout):: self
     class(dictionary), intent(in)             :: dict
+    character(nameLen)                        :: input
+    real(defReal), allocatable, dimension(:)  :: vec                           
+    integer(shortInt)                         :: index
 
     ! Initialise superclass
     call init_super(self, dict)
+
+    ! Initialise virtual density
+    call dict % getorDefault(self % virtual_density, 'virtual_density', .false.)
+    if (self % virtual_density) then
+      call dict % getorDefault(self % direction_type, 'direction_type','isotropic')
+      call dict % getorDefault(self % scale_type, 'scale','uniform')
+      call dict % getorDefault(self % nb_pert_mat, 'nb_pert_mat', 1)
+
+      if (trim(self % scale_type) == 'non_uniform') then
+        allocate(self % deform_type(self % nb_pert_mat))
+        allocate(self % pert_mat(self % nb_pert_mat))
+        allocate(self % pert_mat_id(self % nb_pert_mat))
+        allocate(self % vector_factor(3, self % nb_pert_mat))
+        do index = 1, self % nb_pert_mat
+          input = 'factor_'
+          write(input, '(I0)') index
+          input = trim('factor_')//trim(input)
+          call dict % get(vec, trim(input))
+          self % vector_factor(:,index) = vec
+
+          input = 'pert_mat_'
+          write(input, '(I0)') index
+          input = trim('pert_mat_')//trim(input)
+          call dict % get(self % pert_mat(index), trim(input))
+          self % pert_mat_id(index) = mm_matIdx(self % pert_mat(index))
+
+          input = 'deform_type_'
+          write(input, '(I0)') index
+          input = trim('deform_type_')//trim(input)
+          call dict % get(self % deform_type(index), trim(input))
+        end do
+      else
+        allocate(self % deform_type(1))
+        allocate(self % vector_factor(3, 1))
+        call dict % get(self % deform_type(1), "deform_type_1")
+        call dict % get(vec, "factor_1")
+        self % vector_factor(:,1) = vec
+      end if
+    end if
 
   end subroutine init
 

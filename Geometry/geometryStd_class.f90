@@ -418,7 +418,8 @@ contains
     if (coords % matIdx == OUTSIDE_MAT) then
       surf => self % geom % surfs % getPtr(self % geom % borderIdx)
       call surf % transformBC(coords % lvl(1) % r, &
-                              coords % lvl(1) % dir)
+                              coords % lvl(1) % savedDir)
+      call coords % assignDirection(coords % lvl(1) % savedDir)
 
       ! Return particle to geometry
       call self % placeCoord(coords)
