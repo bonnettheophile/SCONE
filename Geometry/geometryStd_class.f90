@@ -407,18 +407,31 @@ contains
     type(coordList), intent(inout) :: coords
     real(defReal), intent(in)      :: dist
     class(surface), pointer        :: surf
+    real(defReal)                  :: savedDir(3)
+    integer(shortInt)              :: i
 
     ! Move the coords above the geometry
     call coords % moveGlobal(dist)
 
     ! Place coordinates back into geometry
+
+    savedDir = coords % lvl(1) % savedDir
     call self % placeCoord(coords)
+    call coords % assignSavedDirection(savedDir)
 
     ! If point is outside apply boundary transformations
     if (coords % matIdx == OUTSIDE_MAT) then
       surf => self % geom % surfs % getPtr(self % geom % borderIdx)
       call surf % transformBC(coords % lvl(1) % r, &
-                              coords % lvl(1) % savedDir)
+                              coords % lvl(1) % dir)
+      
+      ! In case of reflective BC, check if direction has changed sign and flip savedDir if it has
+      do i = i, 3
+        if (coords % lvl(1) % dir(i) * coords % lvl(1) % savedDir(i) < 0.0) then
+          coords % lvl(1) % savedDir(i) = -coords % lvl(1) % savedDir(i)
+        end if
+      end do
+
       call coords % assignDirection(coords % lvl(1) % savedDir)
 
       ! Return particle to geometry

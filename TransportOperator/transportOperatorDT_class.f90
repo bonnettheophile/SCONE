@@ -70,8 +70,11 @@ contains
     ! Should never happen! Prevents Inf distances
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
+    
     DTLoop:do
+
       call p % pointSaved(p % dirGlobal())
+
       distance = -log( p% pRNG % get() ) * majorant_inv
         
       speed = p % getSpeed()
