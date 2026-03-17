@@ -43,12 +43,36 @@ module transportOperatorDT_class
     integer(shortInt)                :: nb_pert_mat
   contains
     procedure :: transit => deltaTracking
+    procedure :: rTransform
+    procedure :: xTransform
     ! Override procedure
     procedure :: init
 
   end type transportOperatorDT
 
 contains
+
+  function rTransform(self, x) result(r)
+    class(transportOperatorDT), intent(in) :: self
+    real(defReal), intent(in)              :: x(3)
+    real(defReal)                          :: r(3)
+
+    r(1) = sqrt(sum(x(1:2)**2))
+    r(2) = atan2(x(2), x(1))
+    r(3) = x(3)
+
+  end function rTransform
+
+  function xTransform(self, r) result(x)
+    class(transportOperatorDT), intent(in) :: self
+    real(defReal), intent(in)              :: r(3)
+    real(defReal)                          :: x(3)
+
+    x(1) = r(1)*cos(r(2))
+    x(2) = r(1)*sin(r(2))
+    x(3) = r(3)
+
+  end function xTransform
 
   !!
   !! Performs delta tracking until a real collision point is found
@@ -62,7 +86,13 @@ contains
     real(defReal)                             :: majorant_inv, sigmaT, distance, speed, time
     real(defReal)                             :: cosines(3), real_vector(3), virtual_vector(3)
     real(defReal)                             :: virtual_cosines(3), virtual_dist, flight_stretch_factor
+    real(defReal)                             :: rC, rS, r0, delta
     character(100), parameter :: Here = 'deltaTracking (transportOperatorDT_class.f90)'
+
+    rC = 0.0
+    rS = 0.54
+    r0 = 0.63
+    if (self % virtual_density) delta = p % f(1) 
 
     ! Get majorant XS inverse: 1/Sigma_majorant
     majorant_inv = ONE / self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS)
@@ -70,7 +100,6 @@ contains
     ! Should never happen! Prevents Inf distances
     if (abs(majorant_inv) > huge(majorant_inv)) call fatalError(Here, "Majorant is 0")
 
-    
     DTLoop:do
 
       call p % pointSaved(p % dirGlobal())
@@ -114,11 +143,46 @@ contains
         call p % point(virtual_cosines)
 
         distance = virtual_dist
+      elseif (self % virtual_density .and. trim(self % scale_type) == 'non_uniform') then
+        real_vector = self % rTransform(p % coords % lvl(1) % r)
+        if (delta /= 0.0) then 
+          if (real_vector(1) < rS) then 
+            real_vector(1) = real_vector(1) + delta / rS * real_vector(1)
+          elseif (real_vector(1) > rS .and. real_vector(1) < r0) then 
+            real_vector(1) = real_vector(1) + delta / (rS - r0) * (real_vector(1) - r0)
+          end if
+        end if
+        
+        real_vector = self % xTransform(real_vector)
+
+
+        call p % coords % assignPosition(real_vector)
+        !call self % geom % placeCoord(p % coords)
+
+
       end if
 
       ! Move particle in the geometry and time
       ! Note: teleport routine has been modified to use savedDir instead of current dir
       call self % geom % teleport(p % coords, distance)
+
+      if (self % virtual_density .and. trim(self % scale_type) == 'non_uniform') then
+        real_vector = self % rTransform(p % coords % lvl(1) % r)
+
+        if (delta /= 0.0) then 
+          if (real_vector(1) < rS + delta) then 
+            real_vector(1) = real_vector(1) / (1 + delta / rS)
+          elseif (real_vector(1) > rS + delta .and. real_vector(1) < r0) then 
+            real_vector(1) = (real_vector(1) + delta * r0 / (rS - r0)) / (1 + delta / (rS - r0))
+          end if
+        end if
+        
+
+        real_vector = self % xTransform(real_vector)
+        call p % coords % assignPosition(real_vector)
+        call self % geom % placeCoord(p % coords)
+      end if
+
       p % time = p % time + distance / speed
       
       select case(p % matIdx())

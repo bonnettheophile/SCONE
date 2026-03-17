@@ -103,9 +103,12 @@ contains
     self % geom => geom
 
     ! Get parameter for virtual density coefficient generation
-    call dict % get(temp, 'eps')
-    self % eps = temp
-
+    if (dict % isPresent('eps')) then
+      call dict % get(temp, 'eps')
+      self % eps = temp
+    else
+      self % eps = 0.0
+    end if
     call dict % getOrDefault(type, 'gpcPert', 'none')
     select case(type)
       case('isotropic')

@@ -560,6 +560,12 @@ contains
     else
       maxDensityScale = NO_DENSITY
     end if
+
+    ! If present, build deformation field
+    if (dict % isPresent('deformation')) then
+      tempDict => dict % getDictPtr('deformation')
+      call new_field(tempDict, nameDeformation)
+    end if
     
     ! Update majorant in case of density and temperature fields
     call self % nucData % initMajorant(.false., maxTemp = maxTemperature, scaleDensity = maxDensityScale)

@@ -14,6 +14,7 @@ module fieldFactory_func
   use uniFissSitesField_class,  only : uniFissSitesField
   use weightWindowsField_class, only : weightWindowsField
   use cartesianField_class,     only : cartesianField
+  use deformationField_class,   only : deformationField
 
   ! Geometry
   use geometryReg_mod,          only : gr_addField => addField
@@ -27,7 +28,8 @@ module fieldFactory_func
                                                                      'uniformVectorField',&
                                                                      'uniFissSitesField ',&
                                                                      'weightWindowsField',&
-                                                                     'cartesianField    ']
+                                                                     'cartesianField    ',&
+                                                                     'deformationField  ']
 
    ! Public interface
    public :: new_field
@@ -71,6 +73,9 @@ contains
 
       case ('cartesianField')
         allocate(cartesianField :: kentta)
+      
+      case ('deformationField')
+        allocate(deformationField :: kentta)
 
       case default
         print '(A)', "AVAILABLE FIELDS:"

@@ -94,6 +94,7 @@ module universalVariables
   character(nameLen), parameter :: nameWW           = 'WeightWindows'
   character(nameLen), parameter :: nameTemperature  = 'temperature'
   character(nameLen), parameter :: nameDensity      = 'density'
+  character(nameLen), parameter :: nameDeformation  = 'deformation'
 
   ! Flags associated with fields
   real(defReal), parameter :: NO_TEMPERATURE = -INF, &
