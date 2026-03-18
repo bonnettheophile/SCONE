@@ -41,7 +41,7 @@ module transportOperatorDT_class
     logical(defBool)                                :: virtualDensity
     logical(defBool)                                :: isGPC
     character(nameLen)                              :: scaleType
-    character(nameLen), allocatable                 :: pertMat(:), deformType(:)
+    character(nameLen), allocatable                 :: deformType(:)
 
     type(deformationField), pointer :: deformationField
   contains
