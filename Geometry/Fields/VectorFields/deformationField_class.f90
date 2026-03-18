@@ -80,7 +80,7 @@ contains
     class(deformationField), intent(inout)          :: self
     class(dictionary), intent(in)                 :: dict
     type(dictionary)                              :: tempDict
-    integer(shortInt)                             :: N, i, j, k, idx0
+    integer(shortInt)                             :: N, j, k, idx0
     integer(shortInt), dimension(:), allocatable  :: tempI
     real(defReal), dimension(:), allocatable      :: temp
     real(defReal), dimension(3)                   :: origin
@@ -129,6 +129,10 @@ contains
     if (any(self % pitch < 10 * SURF_TOL)) then
      call fatalError(Here, 'Pitch size must be larger than: '//numToChar( 10 * SURF_TOL))
    end if
+
+    ! Load deformation parameters
+    call dict % get(self % rS, 'rS')
+    call dict % get(self % r0, 'r0')
 
     ! Calculate halfwidth and corner
     self % a_bar = self % pitch * HALF - SURF_TOL
@@ -194,11 +198,12 @@ contains
   !! Get value of the field at the co-ordinate point
   !!
   !!
-  function forward(self, coords) result(r)
+  function forward(self, coords, X) result(r)
     class(deformationField), intent(in) :: self
     class(coordList), intent(in)      :: coords
+    real(defReal), dimension(:), intent(in), optional :: X
     real(defReal), dimension(3)       :: r
-    real(defReal)                     :: delta, d
+    real(defReal)                     :: delta
     integer(shortInt)                 :: localID, temp, base
     integer(shortInt), dimension(3)   :: ijk
     real(defReal), dimension(3)       :: r_bar
@@ -206,10 +211,10 @@ contains
     localID = self % getLocalID(coords % lvl(1) % r, coords % lvl(1) % dir)
     
     ! Catch case if particle is outside the lattice
+    ! In this case, we return the original coordinates (i.e. no deformation)
     if (localID == 0) then
-      d = self % outline % distance(coords % lvl(1) % r, coords % lvl(1) % dir)
+      r = coords % lvl(1) % r
       return
-
     end if
 
     ! Compute ijk of localID
@@ -229,7 +234,11 @@ contains
     r_bar = coords % lvl(1) % r - self % corner
     r_bar = r_bar - (ijk - HALF) * self % pitch
 
-    delta = self % delta(localID)
+    if (present(X)) then
+      delta = X(1) * self % delta(localID)
+    else
+      delta = self % delta(localID)
+    end if
 
     ! Transform to cylindrical coordinates, apply deformation, then transform back to Cartesian
     r = self % rTransform(r_bar)
@@ -243,6 +252,7 @@ contains
         
     r = self % xTransform(r)
 
+
     ! Revert to original coordinates
     r = r + self % corner + (ijk - HALF) * self % pitch
 
@@ -252,22 +262,23 @@ contains
   !! Get value of the field at the co-ordinate point
   !!
   !!
-  function backward(self, coords) result(r)
+  function backward(self, coords, X) result(r)
     class(deformationField), intent(in) :: self
     class(coordList), intent(in)      :: coords
+    real(defReal), dimension(:), intent(in), optional :: X
     real(defReal), dimension(3)       :: r
-    real(defReal)                     :: delta, d
+    real(defReal)                     :: delta
     integer(shortInt)                 :: localID, temp, base
     integer(shortInt), dimension(3)   :: ijk
     real(defReal), dimension(3)       :: r_bar
     
     localID = self % getLocalID(coords % lvl(1) % r, coords % lvl(1) % dir)
-    
-    ! Catch case if particle is outside the lattice
-    if (localID == 0) then
-      d = self % outline % distance(coords % lvl(1) % r, coords % lvl(1) % dir)
-      return
 
+    ! Catch case if particle is outside the lattice
+    ! Return unchanged position, as deformation is only applied within lattice
+    if (localID == 0) then
+      r = coords % lvl(1) % r
+      return
     end if
 
     ! Compute ijk of localID
@@ -287,7 +298,11 @@ contains
     r_bar = coords % lvl(1) % r - self % corner
     r_bar = r_bar - (ijk - HALF) * self % pitch
 
-    delta = self % delta(localID)
+    if (present(X)) then
+      delta = X(1) * self % delta(localID)
+    else
+      delta = self % delta(localID)
+    end if
 
     ! Transform to cylindrical coordinates, apply deformation, then transform back to Cartesian
     r = self % rTransform(r_bar)

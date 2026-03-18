@@ -16,6 +16,9 @@ module transportOperatorDT_class
 
   ! Geometry interfaces
   use geometry_inter,           only : geometry
+  use geometryReg_mod,                only : gr_fieldIdx => fieldIdx, gr_fieldPtr => fieldPtr
+  use deformationField_class,         only : deformationField, deformationField_TptrCast
+
 
   ! Tally interface
   use tallyCodes
@@ -34,45 +37,21 @@ module transportOperatorDT_class
   !! Transport operator that moves a particle with delta tracking
   !!
   type, public, extends(transportOperator) :: transportOperatorDT
-    real(defReal)                    :: product_factor 
-    real(defReal), dimension(:,:), allocatable      :: vector_factor
-    logical(defBool)                 :: virtual_density, cross_over = .false.
-    character(nameLen)               :: direction_type, scale_type
-    character(nameLen), allocatable  :: pert_mat(:), deform_type(:)
-    integer(shortInt), allocatable   :: pert_mat_id(:)
-    integer(shortInt)                :: nb_pert_mat
+    real(defReal), dimension(:), allocatable        :: vectorFactor
+    logical(defBool)                                :: virtualDensity
+    logical(defBool)                                :: isGPC
+    character(nameLen)                              :: scaleType
+    character(nameLen), allocatable                 :: pertMat(:), deformType(:)
+
+    type(deformationField), pointer :: deformationField
   contains
     procedure :: transit => deltaTracking
-    procedure :: rTransform
-    procedure :: xTransform
     ! Override procedure
     procedure :: init
 
   end type transportOperatorDT
 
 contains
-
-  function rTransform(self, x) result(r)
-    class(transportOperatorDT), intent(in) :: self
-    real(defReal), intent(in)              :: x(3)
-    real(defReal)                          :: r(3)
-
-    r(1) = sqrt(sum(x(1:2)**2))
-    r(2) = atan2(x(2), x(1))
-    r(3) = x(3)
-
-  end function rTransform
-
-  function xTransform(self, r) result(x)
-    class(transportOperatorDT), intent(in) :: self
-    real(defReal), intent(in)              :: r(3)
-    real(defReal)                          :: x(3)
-
-    x(1) = r(1)*cos(r(2))
-    x(2) = r(1)*sin(r(2))
-    x(3) = r(3)
-
-  end function xTransform
 
   !!
   !! Performs delta tracking until a real collision point is found
@@ -84,15 +63,17 @@ contains
     class(particleDungeon), intent(inout)     :: thisCycle
     class(particleDungeon), intent(inout)     :: nextCycle
     real(defReal)                             :: majorant_inv, sigmaT, distance, speed, time
-    real(defReal)                             :: cosines(3), real_vector(3), virtual_vector(3)
-    real(defReal)                             :: virtual_cosines(3), virtual_dist, flight_stretch_factor
-    real(defReal)                             :: rC, rS, r0, delta
+    real(defReal)                             :: cosines(3), realVector(3), virtualVector(3)
+    real(defReal)                             :: virtualCosines(3), virtualDist, flightStretch
+    real(defReal)                             :: f(3)
     character(100), parameter :: Here = 'deltaTracking (transportOperatorDT_class.f90)'
 
-    rC = 0.0
-    rS = 0.54
-    r0 = 0.63
-    if (self % virtual_density) delta = p % f(1) 
+    ! If gpc calculation, use particle-wise deformation
+    if (self % isGPC .and. trim(self % scaleType) == 'uniform') then
+      f = p % f
+    elseif (trim(self % scaleType) == 'uniform') then
+      f = self % vectorFactor
+    end if
 
     ! Get majorant XS inverse: 1/Sigma_majorant
     majorant_inv = ONE / self % xsData % getTrackingXS(p, p % matIdx(), MAJORANT_XS)
@@ -115,71 +96,62 @@ contains
         p % fate = AGED_FATE
       end if
 
-      if (self % virtual_density .and. trim(self % scale_type) == 'uniform') then
+      if (self % virtualDensity .and. trim(self % scaleType) == 'uniform') then
         cosines(:) = p % coords % lvl(1) % savedDir 
-        real_vector = distance*cosines
+        realVector = distance*cosines
 
-        if (self % deform_type(1) == 'swelling') then
-          virtual_vector(1) = real_vector(1) * p % f(2) * p % f(3)
-          virtual_vector(2) = real_vector(2) * p % f(1) * p % f(3)
-          virtual_vector(3) = real_vector(3) * p % f(1) * p % f(2)
-          virtual_dist = sqrt(sum(virtual_vector**2))
-          flight_stretch_factor = virtual_dist/distance
-          virtual_cosines(1) = cosines(1) * p % f(2) * &
-              p % f(3) / flight_stretch_factor
-          virtual_cosines(2) = cosines(2) * p % f(1) * &
-              p % f(3) / flight_stretch_factor
-          virtual_cosines(3) = cosines(3) * p % f(1) * &
-              p % f(2) / flight_stretch_factor
-        elseif (self % deform_type(1) == 'expansion') then
-          virtual_vector = real_vector/p % f
-          virtual_dist = sqrt(sum(virtual_vector**2))
-          flight_stretch_factor = virtual_dist/distance
-          virtual_cosines = cosines / (p % f*flight_stretch_factor)
+        if (self % deformType(1) == 'swelling') then
+          virtualVector(1) = realVector(1) * f(2) * f(3)
+          virtualVector(2) = realVector(2) * f(1) * f(3)
+          virtualVector(3) = realVector(3) * f(1) * f(2)
+          virtualDist = sqrt(sum(virtualVector**2))
+          flightStretch = virtualDist/distance
+          virtualCosines(1) = cosines(1) * f(2) * &
+              f(3) / flightStretch
+          virtualCosines(2) = cosines(2) * f(1) * &
+              f(3) / flightStretch
+          virtualCosines(3) = cosines(3) * f(1) * &
+              f(2) / flightStretch
+        elseif (self % deformType(1) == 'expansion') then
+          virtualVector = realVector / f
+          virtualDist = sqrt(sum(virtualVector**2))
+          flightStretch = virtualDist / distance
+          virtualCosines = cosines / (f * flightStretch)
         else
           call fatalError(Here, 'Unrecognised geometric deformation')
         end if
       
-        call p % point(virtual_cosines)
+        call p % point(virtualCosines)
 
-        distance = virtual_dist
-      elseif (self % virtual_density .and. trim(self % scale_type) == 'non_uniform') then
-        real_vector = self % rTransform(p % coords % lvl(1) % r)
-        if (delta /= 0.0) then 
-          if (real_vector(1) < rS) then 
-            real_vector(1) = real_vector(1) + delta / rS * real_vector(1)
-          elseif (real_vector(1) > rS .and. real_vector(1) < r0) then 
-            real_vector(1) = real_vector(1) + delta / (rS - r0) * (real_vector(1) - r0)
-          end if
+        distance = virtualDist
+
+      elseif (self % virtualDensity .and. trim(self % scaleType) == 'non_uniform') then
+
+        ! Transform to real space
+        if (self % isGPC) then
+          realVector = self % deformationField % forward(p % coords, p % X)
+        else
+          realVector = self % deformationField % forward(p % coords)
         end if
-        
-        real_vector = self % xTransform(real_vector)
 
-
-        call p % coords % assignPosition(real_vector)
-        !call self % geom % placeCoord(p % coords)
-
-
+        call p % coords % assignPosition(realVector)
       end if
 
       ! Move particle in the geometry and time
       ! Note: teleport routine has been modified to use savedDir instead of current dir
+      ! Note: boundary conditions should not be perturbed by local deformation
       call self % geom % teleport(p % coords, distance)
 
-      if (self % virtual_density .and. trim(self % scale_type) == 'non_uniform') then
-        real_vector = self % rTransform(p % coords % lvl(1) % r)
+      if (self % virtualDensity .and. trim(self % scaleType) == 'non_uniform') then
 
-        if (delta /= 0.0) then 
-          if (real_vector(1) < rS + delta) then 
-            real_vector(1) = real_vector(1) / (1 + delta / rS)
-          elseif (real_vector(1) > rS + delta .and. real_vector(1) < r0) then 
-            real_vector(1) = (real_vector(1) + delta * r0 / (rS - r0)) / (1 + delta / (rS - r0))
-          end if
+        ! Transform back to material space for xs lookup
+        if (self % isGPC) then
+          realVector = self % deformationField % backward(p % coords, p % X)
+        else
+          realVector = self % deformationField % backward(p % coords)
         end if
-        
 
-        real_vector = self % xTransform(real_vector)
-        call p % coords % assignPosition(real_vector)
+        call p % coords % assignPosition(realVector)
         call self % geom % placeCoord(p % coords)
       end if
 
@@ -247,7 +219,6 @@ contains
   subroutine init(self, dict)
     class(transportOperatorDT), intent(inout):: self
     class(dictionary), intent(in)             :: dict
-    character(nameLen)                        :: input
     real(defReal), allocatable, dimension(:)  :: vec                           
     integer(shortInt)                         :: index
 
@@ -255,41 +226,20 @@ contains
     call init_super(self, dict)
 
     ! Initialise virtual density
-    call dict % getorDefault(self % virtual_density, 'virtual_density', .false.)
-    if (self % virtual_density) then
-      call dict % getorDefault(self % direction_type, 'direction_type','isotropic')
-      call dict % getorDefault(self % scale_type, 'scale','uniform')
-      call dict % getorDefault(self % nb_pert_mat, 'nb_pert_mat', 1)
+    call dict % getorDefault(self % virtualDensity, 'virtualDensity', .false.)
+    if (self % virtualDensity) then
+      call dict % getorDefault(self % scaleType, 'scale','uniform')
+      call dict % getorDefault(self % isGPC, 'gpc', .false.)
 
-      if (trim(self % scale_type) == 'non_uniform') then
-        allocate(self % deform_type(self % nb_pert_mat))
-        allocate(self % pert_mat(self % nb_pert_mat))
-        allocate(self % pert_mat_id(self % nb_pert_mat))
-        allocate(self % vector_factor(3, self % nb_pert_mat))
-        do index = 1, self % nb_pert_mat
-          input = 'factor_'
-          write(input, '(I0)') index
-          input = trim('factor_')//trim(input)
-          call dict % get(vec, trim(input))
-          self % vector_factor(:,index) = vec
-
-          input = 'pert_mat_'
-          write(input, '(I0)') index
-          input = trim('pert_mat_')//trim(input)
-          call dict % get(self % pert_mat(index), trim(input))
-          self % pert_mat_id(index) = mm_matIdx(self % pert_mat(index))
-
-          input = 'deform_type_'
-          write(input, '(I0)') index
-          input = trim('deform_type_')//trim(input)
-          call dict % get(self % deform_type(index), trim(input))
-        end do
+      if (trim(self % scaleType) == 'non_uniform') then
+        index = gr_fieldIdx(nameDeformation)
+        self % deformationField => deformationField_TptrCast(gr_fieldPtr(index))
       else
-        allocate(self % deform_type(1))
-        allocate(self % vector_factor(3, 1))
-        call dict % get(self % deform_type(1), "deform_type_1")
-        call dict % get(vec, "factor_1")
-        self % vector_factor(:,1) = vec
+        allocate(self % deformType(1))
+        allocate(self % vectorFactor(3))
+        call dict % get(self % deformType(1), "deformType")
+        call dict % get(vec, "factor")
+        self % vectorFactor = vec
       end if
     end if
 

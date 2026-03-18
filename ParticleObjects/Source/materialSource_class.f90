@@ -237,6 +237,8 @@ contains
         p % X = ZERO
       end if
 
+      p % f        = ONE + self % eps * p % X       
+
       mu = TWO * rand % get() - ONE
       phi = TWO_PI * rand % get()
       p % dir = rotateVector([ONE, ZERO, ZERO], mu, phi)

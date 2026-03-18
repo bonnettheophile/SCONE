@@ -246,7 +246,7 @@ contains
         p % X = ZERO
       end if
       
-      p % f        = self % eps * (1 + p % X )      
+      p % f        = ONE + self % eps * p % X       
 
       ! Set Energy
       select type (nucData)
