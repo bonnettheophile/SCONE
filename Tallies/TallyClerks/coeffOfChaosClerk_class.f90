@@ -168,6 +168,9 @@ contains
       else if (self % P == 4) then
         gaussPoints = G5
         G = 5
+      else if (self % P == 5) then
+        gaussPoints = G6
+        G = 6
       else
         call fatalError(Here, "Gauss quadrature order not supported")
       end if
