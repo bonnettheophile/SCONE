@@ -248,7 +248,7 @@ contains
     r_bar = r_bar - (ijk - HALF) * self % pitch
 
     if (present(X)) then
-      delta = X(1) * self % delta(localID)
+      delta = (X(1) + ONE) / TWO * self % delta(localID)
     else
       delta = self % delta(localID)
     end if
@@ -320,7 +320,7 @@ contains
     r_bar = r_bar - (ijk - HALF) * self % pitch
 
     if (present(X)) then
-      delta = X(1) * self % delta(localID)
+      delta = (X(1) + ONE) / TWO * self % delta(localID)
     else
       delta = self % delta(localID)
     end if
