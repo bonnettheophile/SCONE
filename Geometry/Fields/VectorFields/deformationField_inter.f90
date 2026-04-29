@@ -1,4 +1,4 @@
-module deformationField_class
+module deformationField_inter
 
   use numPrecision
   use universalVariables
@@ -18,8 +18,6 @@ module deformationField_class
   !! Public Pointer Cast
   !!
   public :: deformationField_TptrCast
-
-  integer(shortInt), parameter :: ALL_MATS = -1
 
   !!
   !! Piecewise constant field constructed from a lattice-like grid. 
@@ -45,8 +43,7 @@ module deformationField_class
   !!
   !! }
   !!
-  type, public, extends(vectorField) :: deformationField
-    private
+  type, public, abstract, extends(vectorField) :: deformationField
     real(defReal), dimension(3)               :: pitch = ZERO
     integer(shortInt), dimension(3)           :: sizeN = 0
     integer(shortInt)                         :: N = 0
@@ -62,14 +59,40 @@ module deformationField_class
     procedure :: init
     procedure :: at
     procedure :: atP
-    procedure :: forward
-    procedure :: backward
+    procedure(forward), deferred :: forward
+    procedure(backward), deferred :: backward
     procedure :: rTransform
     procedure :: xTransform
     procedure :: kill
 
-    procedure, private :: getLocalID
+    procedure :: getLocalID
   end type deformationField
+
+  abstract interface 
+
+    !!
+    !! Forward transformation. Get value of the field at the co-ordinate point
+    !!
+    !!
+    function forward(self, coords, X) result(val)
+      import :: deformationField, coordList, defReal
+      class(deformationField), intent(in) :: self
+      class(coordList), intent(in)      :: coords
+      real(defReal), dimension(:), intent(in), optional :: X
+      real(defReal), dimension(3)       :: val
+    end function forward
+
+    !! Backward transformation. Get value of the field at the co-ordinate point
+    !!
+    function backward(self, coords, X) result(val)
+      import :: deformationField, coordList, defReal
+      class(deformationField), intent(in) :: self
+      class(coordList), intent(in)      :: coords
+      real(defReal), dimension(:), intent(in), optional :: X
+      real(defReal), dimension(3)       :: val
+    end function backward
+
+  end interface
 
 contains
 
@@ -193,133 +216,6 @@ contains
     x(3) = r(3)
 
   end function xTransform
-
-  !!
-  !! Get value of the field at the co-ordinate point
-  !!
-  !!
-  function forward(self, coords, X) result(r)
-    class(deformationField), intent(in) :: self
-    class(coordList), intent(in)      :: coords
-    real(defReal), dimension(:), intent(in), optional :: X
-    real(defReal), dimension(3)       :: r
-    real(defReal)                     :: delta
-    integer(shortInt)                 :: localID, temp, base
-    integer(shortInt), dimension(3)   :: ijk
-    real(defReal), dimension(3)       :: r_bar
-    
-    localID = self % getLocalID(coords % lvl(1) % r, coords % lvl(1) % dir)
-    
-    ! Catch case if particle is outside the lattice
-    ! In this case, we return the original coordinates (i.e. no deformation)
-    if (localID == 0) then
-      r = coords % lvl(1) % r
-      return
-    end if
-
-    ! Compute ijk of localID
-    temp = localID - 1
-
-    base = temp / self % sizeN(1)
-    ijk(1) = temp - self % sizeN(1) * base + 1
-
-    temp = base
-    base = temp / self % sizeN(2)
-    ijk(2) = temp - self % sizeN(2) * base + 1
-
-    ijk(3) = base + 1
-
-    ! Find position wrt lattice cell centre
-    ! Need to use localID to properly handle under and overshoots
-    r_bar = coords % lvl(1) % r - self % corner
-    r_bar = r_bar - (ijk - HALF) * self % pitch
-
-    if (present(X)) then
-      delta = X(1) * self % delta(localID)
-    else
-      delta = self % delta(localID)
-    end if
-
-    ! Transform to cylindrical coordinates, apply deformation, then transform back to Cartesian
-    r = self % rTransform(r_bar)
-    if (delta /= 0.0) then 
-      if (r(1) < self % rS) then 
-        r(1) = r(1) + delta / self % rS * r(1)
-      elseif (r(1) > self % rS .and. r(1) < self % r0) then 
-        r(1) = r(1) + delta / (self % rS - self % r0) * (r(1) - self % r0)
-      end if
-    end if
-        
-    r = self % xTransform(r)
-
-
-    ! Revert to original coordinates
-    r = r + self % corner + (ijk - HALF) * self % pitch
-
-  end function forward
-
-    !!
-  !! Get value of the field at the co-ordinate point
-  !!
-  !!
-  function backward(self, coords, X) result(r)
-    class(deformationField), intent(in) :: self
-    class(coordList), intent(in)      :: coords
-    real(defReal), dimension(:), intent(in), optional :: X
-    real(defReal), dimension(3)       :: r
-    real(defReal)                     :: delta
-    integer(shortInt)                 :: localID, temp, base
-    integer(shortInt), dimension(3)   :: ijk
-    real(defReal), dimension(3)       :: r_bar
-    
-    localID = self % getLocalID(coords % lvl(1) % r, coords % lvl(1) % dir)
-
-    ! Catch case if particle is outside the lattice
-    ! Return unchanged position, as deformation is only applied within lattice
-    if (localID == 0) then
-      r = coords % lvl(1) % r
-      return
-    end if
-
-    ! Compute ijk of localID
-    temp = localID - 1
-
-    base = temp / self % sizeN(1)
-    ijk(1) = temp - self % sizeN(1) * base + 1
-
-    temp = base
-    base = temp / self % sizeN(2)
-    ijk(2) = temp - self % sizeN(2) * base + 1
-
-    ijk(3) = base + 1
-
-    ! Find position wrt lattice cell centre
-    ! Need to use localID to properly handle under and overshoots
-    r_bar = coords % lvl(1) % r - self % corner
-    r_bar = r_bar - (ijk - HALF) * self % pitch
-
-    if (present(X)) then
-      delta = X(1) * self % delta(localID)
-    else
-      delta = self % delta(localID)
-    end if
-
-    ! Transform to cylindrical coordinates, apply deformation, then transform back to Cartesian
-    r = self % rTransform(r_bar)
-    if (delta /= 0.0) then 
-      if (r(1) < self % rS + delta) then 
-        r(1) = r(1) / (1 + delta / self % rS)
-      elseif (r(1) > self % rS + delta .and. r(1) < self % r0) then 
-        r(1) = (r(1) + delta * self % r0 / (self % rS - self % r0)) / (1 + delta / (self % rS - self % r0))
-      end if
-    end if
-        
-    r = self % xTransform(r)
-
-    ! Revert to original coordinates
-    r = r + self % corner + (ijk - HALF) * self % pitch
-
-  end function backward
   
   !!
   !! Get value of the field at the particle's location
@@ -419,10 +315,10 @@ contains
   !!
   pure function deformationField_TptrCast(source) result(ptr)
     class(field), pointer, intent(in) :: source
-    type(deformationField), pointer     :: ptr
+    class(deformationField), pointer  :: ptr
 
     select type (source)
-      type is (deformationField)
+      class is (deformationField)
         ptr => source
 
       class default
@@ -431,4 +327,4 @@ contains
 
   end function deformationField_TptrCast
 
-end module deformationField_class
+end module deformationField_inter

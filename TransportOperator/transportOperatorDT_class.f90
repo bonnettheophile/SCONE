@@ -17,7 +17,7 @@ module transportOperatorDT_class
   ! Geometry interfaces
   use geometry_inter,           only : geometry
   use geometryReg_mod,                only : gr_fieldIdx => fieldIdx, gr_fieldPtr => fieldPtr
-  use deformationField_class,         only : deformationField, deformationField_TptrCast
+  use deformationField_inter,         only : deformationField, deformationField_TptrCast
 
 
   ! Tally interface
@@ -43,7 +43,7 @@ module transportOperatorDT_class
     character(nameLen)                              :: scaleType
     character(nameLen), allocatable                 :: deformType(:)
 
-    type(deformationField), pointer :: deformationField
+    class(deformationField), pointer :: deformationField
   contains
     procedure :: transit => deltaTracking
     ! Override procedure

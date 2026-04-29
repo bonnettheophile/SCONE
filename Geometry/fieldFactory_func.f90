@@ -8,13 +8,16 @@ module fieldFactory_func
   use dictionary_class,  only : dictionary
 
   ! Fields
-  use field_inter,              only : field
-  use uniformScalarField_class, only : uniformScalarField
-  use uniformVectorField_class, only : uniformVectorField
-  use uniFissSitesField_class,  only : uniFissSitesField
-  use weightWindowsField_class, only : weightWindowsField
-  use cartesianField_class,     only : cartesianField
-  use deformationField_class,   only : deformationField
+  use field_inter,                     only : field
+  use uniformScalarField_class,        only : uniformScalarField
+  use uniformVectorField_class,        only : uniformVectorField
+  use uniFissSitesField_class,         only : uniFissSitesField
+  use weightWindowsField_class,        only : weightWindowsField
+  use cartesianField_class,            only : cartesianField
+  use deformationField_inter,          only : deformationField
+  use radialDeformationField_class,    only : radialDeformationField
+  use hexagonalDeformationField_class, only : hexagonalDeformationField
+  use holeRadialDeformationField_class, only : holeRadialDeformationField
 
   ! Geometry
   use geometryReg_mod,          only : gr_addField => addField
@@ -24,12 +27,14 @@ module fieldFactory_func
 
 
   !! Parameters
-  character(nameLen), dimension(*), parameter :: AVAILABLE_FIELDS = ['uniformScalarField',&
-                                                                     'uniformVectorField',&
-                                                                     'uniFissSitesField ',&
-                                                                     'weightWindowsField',&
-                                                                     'cartesianField    ',&
-                                                                     'deformationField  ']
+  character(nameLen), dimension(*), parameter :: AVAILABLE_FIELDS = ['uniformScalarField        ',&
+                                                                     'uniformVectorField        ',&
+                                                                     'uniFissSitesField         ',&
+                                                                     'weightWindowsField        ',&
+                                                                     'cartesianField            ',&
+                                                                     'radialDeformationField    ',&
+                                                                     'hexagonalDeformationField ',&
+                                                                     'holeRadialDeformationField']
 
    ! Public interface
    public :: new_field
@@ -74,8 +79,14 @@ contains
       case ('cartesianField')
         allocate(cartesianField :: kentta)
       
-      case ('deformationField')
-        allocate(deformationField :: kentta)
+      case ('radialDeformationField')
+        allocate(radialDeformationField :: kentta)
+      
+      case ('hexagonalDeformationField')
+        allocate(hexagonalDeformationField :: kentta)
+
+      case ('holeRadialDeformationField')
+        allocate(holeRadialDeformationField :: kentta)
 
       case default
         print '(A)', "AVAILABLE FIELDS:"
