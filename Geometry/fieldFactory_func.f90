@@ -18,6 +18,8 @@ module fieldFactory_func
   use radialDeformationField_class,    only : radialDeformationField
   use hexagonalDeformationField_class, only : hexagonalDeformationField
   use holeRadialDeformationField_class, only : holeRadialDeformationField
+  use axialDeformationField_class,      only : axialDeformationField
+  use gapDeformationField_class,       only : gapDeformationField
 
   ! Geometry
   use geometryReg_mod,          only : gr_addField => addField
@@ -34,7 +36,9 @@ module fieldFactory_func
                                                                      'cartesianField            ',&
                                                                      'radialDeformationField    ',&
                                                                      'hexagonalDeformationField ',&
-                                                                     'holeRadialDeformationField']
+                                                                     'holeRadialDeformationField',&
+                                                                     'axialDeformationField     ',&
+                                                                     'gapDeformationField       ']
 
    ! Public interface
    public :: new_field
@@ -87,6 +91,12 @@ contains
 
       case ('holeRadialDeformationField')
         allocate(holeRadialDeformationField :: kentta)
+
+      case ('axialDeformationField')
+        allocate(axialDeformationField :: kentta)
+
+      case ('gapDeformationField')
+        allocate(gapDeformationField :: kentta)
 
       case default
         print '(A)', "AVAILABLE FIELDS:"

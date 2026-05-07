@@ -1,4 +1,4 @@
-module holeRadialDeformationField_class
+module gapDeformationField_class
 
   use numPrecision
   use universalVariables
@@ -52,11 +52,11 @@ module holeRadialDeformationField_class
   !!
   !! }
   !!
-  type, public, extends(deformationField) :: holeRadialDeformationField
+  type, public, extends(deformationField) :: gapDeformationField
     type(quadraticFunction)    :: deformationAmplitude
     logical(defBool)           :: variableAmplitude = .false.
-    real(defReal)              :: rI, rO, rPlus, rMinus, rC
-    real(defReal)              :: axialLimit  
+    real(defReal)              :: rI, rO, rMinus, rC
+    real(defReal)              :: gapClosing  
 
   contains
     ! Superclass procedures
@@ -64,7 +64,7 @@ module holeRadialDeformationField_class
     procedure :: backward
     procedure :: init 
 
-  end type holeRadialDeformationField
+  end type gapDeformationField
 
 contains
 
@@ -74,7 +74,7 @@ contains
     class(quadraticFunction), intent(inout) :: self
     real(defReal), dimension(3), intent(in) :: coeffs
     real(defReal), intent(in)               :: zLimit
-    character(100), parameter :: Here = 'quadraticFunction % init (holeRadialDeformationField_class.f90)'
+    character(100), parameter :: Here = 'quadraticFunction % init (gapDeformationField_class.f90)'
     
     self % a = coeffs(1)
     self % b = coeffs(2)
@@ -83,15 +83,24 @@ contains
   end subroutine init_quadraticFunction
 
   !! Evaluate quadratic function at given z value
-  function eval(self, z) result(val)
+  function eval(self, z, X) result(val)
     class(quadraticFunction), intent(in) :: self
-    real(defReal), intent(in) :: z
-    real(defReal) :: val
+    real(defReal), intent(in)           :: z
+    real(defReal), intent(in), optional :: X
+    real(defReal) :: val, X_value
 
-    if (abs(z) > self % zLimit) then
+    if (present(X)) then
+      X_value = X
+    else
+      X_value = ONE
+    end if
+
+    if (z > X_value * self % zLimit) then
+      val = ONE
+    else if (z < ZERO) then
       val = ZERO
     else
-      val = self % a * z**2 + self % b * z + self % c
+      val = self % a * z**2 / X_value ** 2 + self % b * z / X_value + self % c
     end if
 
   end function eval
@@ -99,7 +108,7 @@ contains
   !! Initialisation
   !!
   subroutine init(self, dict)
-    class(holeRadialDeformationField), intent(inout)          :: self
+    class(gapDeformationField), intent(inout)          :: self
     class(dictionary), intent(in)                 :: dict
     type(dictionary)                              :: tempDict
     integer(shortInt)                             :: N, j, k, idx0
@@ -153,19 +162,18 @@ contains
    end if
 
     ! Load deformation parameters
-    call dict % get(self % rI, 'innerAnnulus')
+    call dict % getOrDefault(self % rI, 'innerAnnulus', 0.09_defReal)
     call dict % get(self % rO, 'outerAnnulus')
-    call dict % getOrDefault(self % rC, 'constantPart', ZERO)
+    call dict % get(self % rC, 'rCladding')
     call dict % get(self % rMinus, 'rMinus')
-    call dict % get(self % rPlus, 'rPlus')
     call dict % get(self % variableAmplitude, 'variableAmplitude')
+    call dict % getOrDefault(self % gapClosing, 'gapClosing', ZERO)
 
     if (self % variableAmplitude) then
-      call dict % getOrDefault(self % axialLimit, 'axialLimit', self % pitch(3) / TWO)
-      origin(1) = - ONE / (self % axialLimit ** 2)
-      origin(2) = ZERO
-      origin(3) = ONE
-      call self % deformationAmplitude % init(origin, self % axialLimit)
+      origin(1) = - ONE / (self % gapClosing ** 2)
+      origin(2) = 2 / self % gapClosing
+      origin(3) = ZERO
+      call self % deformationAmplitude % init(origin, self % gapClosing)
       origin = ZERO
     end if
 
@@ -212,7 +220,7 @@ contains
   !!
   !!
   function forward(self, coords, X) result(r)
-    class(holeRadialDeformationField), intent(in) :: self
+    class(gapDeformationField), intent(in) :: self
     class(coordList), intent(in)      :: coords
     real(defReal), dimension(:), intent(in), optional :: X
     real(defReal), dimension(3)       :: r
@@ -220,6 +228,7 @@ contains
     integer(shortInt)                 :: localID, temp, base
     integer(shortInt), dimension(3)   :: ijk
     real(defReal), dimension(3)       :: r_bar
+    real(defReal)                     :: zShift
     
     localID = self % getLocalID(coords % lvl(1) % r, coords % lvl(1) % dir)
     
@@ -246,28 +255,23 @@ contains
     ! Need to use localID to properly handle under and overshoots
     r_bar = coords % lvl(1) % r - self % corner
     r_bar = r_bar - (ijk - HALF) * self % pitch
+    zShift = self % pitch(3) / TWO
 
-    if (present(X)) then
-      delta = (X(1) + ONE) / TWO * self % delta(localID)
-    else
-      delta = self % delta(localID)
-    end if
+    delta = self % delta(localID)
 
-    if (self % variableAmplitude) then
-      delta = delta * self % deformationAmplitude % eval(r_bar(3))
+    if (self % variableAmplitude .and. present(X)) then
+      delta = delta * self % deformationAmplitude % eval(r_bar(3) + zShift, (X(1) + ONE) / TWO)
+    else if (self % variableAmplitude) then
+      delta = delta * self % deformationAmplitude % eval(r_bar(3) + zShift)
     end if
 
     ! Transform to cylindrical coordinates, apply deformation, then transform back to Cartesian
     r = self % rTransform(r_bar)
     if (delta /= 0.0) then 
-      if (r(1) > self % rMinus .and. r(1) < self % rI) then 
-        r(1) = r(1) + delta / (self % rI - self % rMinus) * (self % rMinus - r(1))
-      elseif (r(1) > self % rI .and. r(1) < self % rO) then 
-        r(1) = r(1) + delta / (self % rO - self % rI) * (2 * r(1) - (self % rI + self % rO))
-      elseif (r(1) > self % rO .and. r(1) < self % rC) then
-        r(1) = r(1) + delta
-      elseif (r(1) > self % rC .and. r(1) < self % rPlus) then 
-        r(1) = r(1) + delta / (self % rPlus - self % rC) * (self % rPlus - r(1))
+      if (r(1) > self % rMinus .and. r(1) < self % rO) then 
+        r(1) = r(1) + delta / (self % rO - self % rMinus) * (r(1) - self % rMinus)
+      elseif (r(1) > self % rO .and. r(1) < self % rC) then 
+        r(1) = r(1) + delta / (self % rC - self % rO) * (self % rC - r(1))
       end if
     end if
         
@@ -284,7 +288,7 @@ contains
   !!
   !!
   function backward(self, coords, X) result(r)
-    class(holeRadialDeformationField), intent(in) :: self
+    class(gapDeformationField), intent(in) :: self
     class(coordList), intent(in)      :: coords
     real(defReal), dimension(:), intent(in), optional :: X
     real(defReal), dimension(3)       :: r
@@ -292,11 +296,12 @@ contains
     integer(shortInt)                 :: localID, temp, base
     integer(shortInt), dimension(3)   :: ijk
     real(defReal), dimension(3)       :: r_bar
+    real(defReal)                     :: zShift
     
     localID = self % getLocalID(coords % lvl(1) % r, coords % lvl(1) % dir)
-
+    
     ! Catch case if particle is outside the lattice
-    ! Return unchanged position, as deformation is only applied within lattice
+    ! In this case, we return the original coordinates (i.e. no deformation)
     if (localID == 0) then
       r = coords % lvl(1) % r
       return
@@ -318,28 +323,23 @@ contains
     ! Need to use localID to properly handle under and overshoots
     r_bar = coords % lvl(1) % r - self % corner
     r_bar = r_bar - (ijk - HALF) * self % pitch
+    zShift = self % pitch(3) / TWO
 
-    if (present(X)) then
-      delta = (X(1) + ONE) / TWO * self % delta(localID)
-    else
-      delta = self % delta(localID)
-    end if
+    delta = self % delta(localID)
 
-    if (self % variableAmplitude) then
-      delta = delta * self % deformationAmplitude % eval(r_bar(3))
+    if (self % variableAmplitude .and. present(X)) then
+      delta = delta * self % deformationAmplitude % eval(r_bar(3) + zShift, (X(1) + ONE) / TWO)
+    else if (self % variableAmplitude) then
+      delta = delta * self % deformationAmplitude % eval(r_bar(3) + zShift)
     end if
 
     ! Transform to cylindrical coordinates, apply deformation, then transform back to Cartesian
     r = self % rTransform(r_bar)
     if (delta /= 0.0) then 
-      if (r(1) > self % rMinus .and. r(1) < self % rI - delta) then 
-        r(1) = (r(1) - delta / (self % rI - self % rMinus) * self % rMinus) / (1 - delta / (self % rI - self % rMinus))
-      elseif (r(1) > self % rI - delta .and. r(1) < self % rO + delta) then 
-        r(1) = ((self % rO - self % rI) * r(1) + delta * (self % rO + self % rI)) / (self % rO - self % rI + 2 * delta)
-      elseif (r(1) > self % rO + delta .and. r(1) < self % rC + delta) then
-        r(1) = r(1) - delta
-      elseif (r(1) > self % rO + delta .and. r(1) < self % rPlus) then 
-        r(1) = (r(1) - delta * self % rPlus / (self % rPlus - self % rO)) / (1 - delta / (self % rPlus - self % rO))
+      if (r(1) > self % rMinus .and. r(1) < self % rO + delta) then 
+        r(1) = (r(1) + delta / (self % rO - self % rMinus) * self % rMinus) / (1 + delta / (self % rO - self % rMinus))
+      elseif (r(1) > self % rO + delta .and. r(1) < self % rC) then 
+        r(1) = (r(1) - delta * self % rC / (self % rC - self % rO)) / (1 - delta / (self % rC - self % rO))
       end if
     end if
         
@@ -351,4 +351,4 @@ contains
   end function backward
   
 
-end module holeRadialDeformationField_class
+end module gapDeformationField_class

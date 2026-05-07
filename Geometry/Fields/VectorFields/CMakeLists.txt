@@ -7,6 +7,8 @@ add_sources( ./vectorField_inter.f90
              ./radialDeformationField_class.f90
              ./hexagonalDeformationField_class.f90
              ./holeRadialDeformationField_class.f90
+             ./axialDeformationField_class.f90
+             ./gapDeformationField_class.f90
            )
 
 add_unit_tests( ./Tests/uniformVectorField_test.f90
