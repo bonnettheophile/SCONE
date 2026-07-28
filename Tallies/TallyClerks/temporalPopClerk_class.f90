@@ -5,6 +5,7 @@ module temporalPopClerk_class
   use genericProcedures,          only : fatalError
   use dictionary_class,           only : dictionary
   use particle_class,             only : particle, particleState
+  use particleDungeon_class,      only : particleDungeon
   use outputFile_class,           only : outputFile
   use scoreMemory_class,          only : scoreMemory
   use tallyClerk_inter,           only : tallyClerk, kill_super => kill
@@ -72,6 +73,7 @@ module temporalPopClerk_class
     ! File reports and check status -> run-time procedures
     procedure :: reportTemporalPopIn
     procedure :: reportTemporalPopOut
+    procedure :: reportCycleStart
 
     ! Output procedures
     procedure  :: display
@@ -158,7 +160,7 @@ contains
     class(temporalPopClerk),intent(in)           :: self
     integer(shortInt),dimension(:),allocatable :: validCodes
 
-    validCodes = [temporalPop_CODE]
+    validCodes = [cycleStart_CODE]
 
   end function validReports
 
@@ -175,6 +177,59 @@ contains
     if(allocated(self % map)) S = S * self % map % bins(0)
 
   end function getSize
+
+  subroutine reportCycleStart(self, start, mem)
+    class(temporalPopClerk), intent(inout) :: self
+    class(particleDungeon), intent(in)    :: start
+    type(scoreMemory), intent(inout)      :: mem
+    class(nuclearDatabase), pointer        :: xsData
+    integer(shortInt)                      :: binIdx, i, j
+    integer(longInt)                       :: adrr
+    real(defReal)                          :: scoreVal
+    type(particleState)                    :: state
+    type(particle)                         :: p
+    character(100), parameter :: Here =' reportCycleStart (temporalPopClerk_class.f90)'
+
+    ! Append all bins
+    do i=1, self % width
+
+      do j = 1, start % popSize()
+        ! Get current particle state
+        call start % copy(p, j)
+        state = p
+
+        ! Check if within filter
+        if(allocated( self % filter)) then
+          if(self % filter % isFail(state)) return
+        end if
+
+        ! Find bin index
+        if(allocated(self % map)) then
+          binIdx = self % map % map(state)
+        else
+          binIdx = 1
+        end if
+
+        ! Return if invalid bin index
+        if (binIdx == 0) return
+
+        ! Calculate bin address
+        adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
+
+        xsData => ndReg_get(p % getType(), where = Here)
+        if (.not. p % isdead) then
+          scoreVal = p % w * self % response(i) % get(p, xsData)
+        else
+          scoreVal = ZERO
+        end if
+        call mem % score(scoreVal, adrr + i)
+      end do
+      
+
+    end do
+
+
+  end subroutine reportCycleStart
 
   !!
   !! Process temporal population report

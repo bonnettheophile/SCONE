@@ -183,14 +183,15 @@ contains
       end if
 
         call tally % reportCycleStart(self % currentTime(i))
+        call tally % reportCycleStart(self % precursorDungeons(i))
         nParticles = self % currentTime(i) % popSize()
 
         !$omp parallel do schedule(dynamic)
         gen: do n = 1, nParticles
           pRNG = self % pRNG
+          call self % currentTime(i) % copy(p, n)
           p % pRNG => pRNG
           call p % pRNG % stride(n)
-          call self % currentTime(i) % copy(p, n)
 
           p % timeBinIdx = t
           p % timeMax = t*timeIncrement
@@ -205,12 +206,8 @@ contains
             if ((p % fate == aged_FATE) .or. (p % fate == no_FATE)) then
               p % fate = no_FATE
               p % isdead = .false.
-              call tally % reportTemporalPopIn(p)
-              call tally % reportHittingProbIn(p)
             else
               p % isdead = .true.
-              call tally % reportTemporalPopOut(p)
-              call tally % reportHittingProbOut(p)
             end if
 
             call self % geom % placeCoord(p % coords)
@@ -222,8 +219,6 @@ contains
               if(p % isDead) exit history
               call transOp % transport(p, tally, buffer, buffer)
               if(p % isDead) then
-                call tally % reportTemporalPopOut(p)
-                call tally % reportHittingProbOut(p)
                 exit history
               end if
               if(p % fate == AGED_FATE) then
@@ -236,8 +231,6 @@ contains
                 call collOp % collide(p, tally, buffer, buffer)
               end if
               if(p % isDead) then
-                call tally % reportTemporalPopOut(p)
-                call tally % reportHittingProbOut(p)
                 exit history
               end if
             end do history
