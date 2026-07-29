@@ -183,7 +183,6 @@ contains
       end if
 
         call tally % reportCycleStart(self % currentTime(i))
-        call tally % reportCycleStart(self % precursorDungeons(i))
         nParticles = self % currentTime(i) % popSize()
 
         !$omp parallel do schedule(dynamic)
@@ -193,7 +192,7 @@ contains
           p % pRNG => pRNG
           call p % pRNG % stride(n)
 
-          p % timeBinIdx = t
+          p % timeBinIdx = t+1
           p % timeMax = t*timeIncrement
           if (p % time > p % timeMax) then
             p % fate = aged_FATE
@@ -206,8 +205,12 @@ contains
             if ((p % fate == aged_FATE) .or. (p % fate == no_FATE)) then
               p % fate = no_FATE
               p % isdead = .false.
+              call tally % reportTemporalPopIn(p)
+              call tally % reportHittingProbIn(p)
             else
               p % isdead = .true.
+              call tally % reportTemporalPopOut(p)
+              call tally % reportHittingProbOut(p)
             end if
 
             call self % geom % placeCoord(p % coords)
@@ -219,6 +222,8 @@ contains
               if(p % isDead) exit history
               call transOp % transport(p, tally, buffer, buffer)
               if(p % isDead) then
+                call tally % reportTemporalPopOut(p)
+                call tally % reportHittingProbOut(p)
                 exit history
               end if
               if(p % fate == AGED_FATE) then
@@ -231,6 +236,8 @@ contains
                 call collOp % collide(p, tally, buffer, buffer)
               end if
               if(p % isDead) then
+                call tally % reportTemporalPopOut(p)
+                call tally % reportHittingProbOut(p)
                 exit history
               end if
             end do history
@@ -255,16 +262,20 @@ contains
             !$omp parallel do schedule(dynamic)
             genDelayed: do n = nPrecuCount, nDelayedParticles
               call self % precursorDungeons(i) % copy(p, n)
-              p % timeBinIdx = t
+              p % timeBinIdx = t + 1
 
               if (p % time > t*timeIncrement) then
+                p % timeBinIdx = t
                 call tally % reportTemporalPopIn(p)
                 call tally % reportHittingProbIn(p)
+                p % timeBinIdx = t + 1
               end if
 
               if ((p % time <= t*timeIncrement) .and. (p % time > (t-1)*timeIncrement)) then
+                p % timeBinIdx = t
                 call tally % reportTemporalPopOut(p)
                 call tally % reportHittingProbOut(p)
+                p % timeBinIdx = t + 1
                 p % type = P_NEUTRON
                 pRNG = self % pRNG
                 p % pRNG => pRNG
@@ -342,7 +353,7 @@ contains
             !$omp parallel do schedule(dynamic)
             do n = 1, nDelayedParticles
               call self % precursorDungeons(i) % copy(p_d, n)
-              p_d % timeBinIdx = t
+              p_d % timeBinIdx = t + 1
               call tally % reportTemporalPopIn(p_d)
               call tally % reportHittingProbIn(p_d)
 
@@ -361,6 +372,7 @@ contains
               p_d % time = decay_T
               p_d % w = w_d
               p_d % fate = no_FATE
+              p_d % timeBinIdx = t + 1
 
               ! Add to current dungeon
               call self % nextTime(i) % detain(p_d)

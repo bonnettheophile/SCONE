@@ -4,7 +4,7 @@ module temporalPopClerk_class
   use tallyCodes
   use genericProcedures,          only : fatalError
   use dictionary_class,           only : dictionary
-  use particle_class,             only : particle, particleState
+  use particle_class,             only : particle, particleState, P_PRECURSOR, P_NEUTRON
   use particleDungeon_class,      only : particleDungeon
   use outputFile_class,           only : outputFile
   use scoreMemory_class,          only : scoreMemory
@@ -160,7 +160,7 @@ contains
     class(temporalPopClerk),intent(in)           :: self
     integer(shortInt),dimension(:),allocatable :: validCodes
 
-    validCodes = [cycleStart_CODE]
+    validCodes = [cycleStart_CODE, temporalPop_CODE]
 
   end function validReports
 
@@ -196,36 +196,34 @@ contains
       do j = 1, start % popSize()
         ! Get current particle state
         call start % copy(p, j)
-        state = p
 
-        ! Check if within filter
-        if(allocated( self % filter)) then
-          if(self % filter % isFail(state)) return
-        end if
+        if (.not. p % isdead .and. p % type == P_NEUTRON) then
+          state = p
+          ! Check if within filter
+          if(allocated( self % filter)) then
+            if(self % filter % isFail(state)) return
+          end if
 
-        ! Find bin index
-        if(allocated(self % map)) then
-          binIdx = self % map % map(state)
-        else
-          binIdx = 1
-        end if
+          ! Find bin index
+          if(allocated(self % map)) then
+            binIdx = self % map % map(state)
+          else
+            binIdx = 1
+          end if
 
-        ! Return if invalid bin index
-        if (binIdx == 0) return
+          ! Return if invalid bin index
+          if (binIdx == 0) return
 
-        ! Calculate bin address
-        adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
-
-        xsData => ndReg_get(p % getType(), where = Here)
-        if (.not. p % isdead) then
+          ! Calculate bin address
+          adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
+          xsData => ndReg_get(p % getType(), where = Here)
           scoreVal = p % w * self % response(i) % get(p, xsData)
-        else
-          scoreVal = ZERO
+          call mem % score(scoreVal, adrr + i)
+
         end if
-        call mem % score(scoreVal, adrr + i)
+        
       end do
       
-
     end do
 
 
@@ -247,35 +245,37 @@ contains
     type(particleState)                    :: state
     character(100), parameter :: Here =' reportTemporalPopIn (temporalPopClerk_class.f90)'
 
+    if (p % type == P_PRECURSOR) then
     ! Append all bins
-    do i=1, self % width
+      do i=1, self % width
 
-      ! Get current particle state
-      state = p
+        ! Get current particle state
+        state = p
 
-      ! Check if within filter
-      if(allocated( self % filter)) then
-        if(self % filter % isFail(state)) return
-      end if
+        ! Check if within filter
+        if(allocated( self % filter)) then
+          if(self % filter % isFail(state)) return
+        end if
 
-      ! Find bin index
-      if(allocated(self % map)) then
-        binIdx = self % map % map(state)
-      else
-        binIdx = 1
-      end if
+        ! Find bin index
+        if(allocated(self % map)) then
+          binIdx = self % map % map(state)
+        else
+          binIdx = 1
+        end if
 
-      ! Return if invalid bin index
-      if (binIdx == 0) return
+        ! Return if invalid bin index
+        if (binIdx == 0) return
 
-      ! Calculate bin address
-      adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
+        ! Calculate bin address
+        adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
 
-      xsData => ndReg_get(p % getType(), where = Here)
-      scoreVal = p % w * self % response(i) % get(p, xsData)
-      call mem % score(scoreVal, adrr + i)
+        xsData => ndReg_get(p % getType(), where = Here)
+        scoreVal = p % w * self % response(i) % get(p, xsData)
+        call mem % score(scoreVal, adrr + i)
 
-    end do
+      end do
+    end if
 
   end subroutine reportTemporalPopIn
 
@@ -295,35 +295,37 @@ contains
     type(particleState)                    :: state
     character(100), parameter :: Here =' reportTemporalPopOut (temporalPopClerk_class.f90)'
 
-    ! Append all bins
-    do i=1, self % width
+    if (p % type == P_PRECURSOR) then
+      ! Append all bins
+      do i=1, self % width
 
-      ! Get current particle state
-      state = p
+        ! Get current particle state
+        state = p
 
-      ! Check if within filter
-      if(allocated( self % filter)) then
-        if(self % filter % isFail(state)) return
-      end if
+        ! Check if within filter
+        if(allocated( self % filter)) then
+          if(self % filter % isFail(state)) return
+        end if
 
-      ! Find bin index
-      if(allocated(self % map)) then
-        binIdx = self % map % map(state)
-      else
-        binIdx = 1
-      end if
+        ! Find bin index
+        if(allocated(self % map)) then
+          binIdx = self % map % map(state)
+        else
+          binIdx = 1
+        end if
 
-      ! Return if invalid bin index
-      if (binIdx == 0) return
+        ! Return if invalid bin index
+        if (binIdx == 0) return
 
-      ! Calculate bin address
-      adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
+        ! Calculate bin address
+        adrr = self % getMemAddress() + self % width * (binIdx - 1) - 1
 
-      xsData => ndReg_get(p % getType(), where = Here)
-      scoreVal = -p % w * self % response(i) % get(p, xsData)
-      call mem % score(scoreVal, adrr + i)
+        xsData => ndReg_get(p % getType(), where = Here)
+        scoreVal = -p % w * self % response(i) % get(p, xsData)
+        call mem % score(scoreVal, adrr + i)
 
-    end do
+      end do
+    end if
 
   end subroutine reportTemporalPopOut
 
