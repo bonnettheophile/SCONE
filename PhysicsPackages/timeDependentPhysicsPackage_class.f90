@@ -192,7 +192,7 @@ contains
           p % pRNG => pRNG
           call p % pRNG % stride(n)
 
-          p % timeBinIdx = t+1
+          p % timeBinIdx = t
           p % timeMax = t*timeIncrement
           if (p % time > p % timeMax) then
             p % fate = aged_FATE

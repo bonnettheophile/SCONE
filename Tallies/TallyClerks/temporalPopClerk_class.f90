@@ -199,6 +199,7 @@ contains
 
         if (.not. p % isdead .and. p % type == P_NEUTRON) then
           state = p
+          state % timeBinIdx = p % timeBinIdx + 1
           ! Check if within filter
           if(allocated( self % filter)) then
             if(self % filter % isFail(state)) return

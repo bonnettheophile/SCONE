@@ -155,7 +155,7 @@ contains
     call self % sampleEnergy(p, rand)
     call self % sampleTime(p, rand)
     p % wgt  = ONE
-    p % timeBinIdx = 1
+    p % timeBinIdx = 0
 
   end function sampleParticle
 

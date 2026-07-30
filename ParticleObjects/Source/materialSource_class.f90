@@ -182,7 +182,7 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
-      p % timeBinIdx = 1
+      p % timeBinIdx = 0
 
       mu = TWO * rand % get() - ONE
       phi = TWO_PI * rand % get()

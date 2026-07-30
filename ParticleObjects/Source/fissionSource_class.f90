@@ -201,7 +201,7 @@ contains
       p % time     = ZERO
       p % type     = P_NEUTRON
       p % r        = r
-      p % timeBinIdx = 1
+      p % timeBinIdx = 0
 
       ! Set Energy
       select type (nucData)
